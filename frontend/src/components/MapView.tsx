@@ -10,6 +10,11 @@ interface Props {
   origin: LngLat | null
   destination: LngLat | null
   route: LngLat[] | null
+  // Pan here when it changes (after a search result is picked).
+  focus: { point: LngLat } | null
+  // True when both points are set but no route will arrive (it failed), so
+  // the map shows both markers itself.
+  showBothPoints: boolean
   onMapClick: (point: LngLat) => void
 }
 
@@ -25,7 +30,7 @@ function originElement(): HTMLElement {
 }
 
 /** Draws the map, the two chosen points and the route. Holds no route state itself. */
-export function MapView({ origin, destination, route, onMapClick }: Props) {
+export function MapView({ origin, destination, route, focus, showBothPoints, onMapClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const originMarker = useRef<maplibregl.Marker | null>(null)
@@ -46,6 +51,7 @@ export function MapView({ origin, destination, route, onMapClick }: Props) {
       style: MAP_STYLE_URL,
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
+      attributionControl: { customAttribution: 'Search by <a href="https://photon.komoot.io">Photon</a>' },
     })
     map.addControl(new maplibregl.NavigationControl(), 'bottom-right')
     map.on('click', (event) => onClickRef.current([event.lngLat.lng, event.lngLat.lat]))
@@ -94,6 +100,27 @@ export function MapView({ origin, destination, route, onMapClick }: Props) {
   useEffect(() => {
     syncMarker(mapRef.current, destinationMarker, destination, () => new maplibregl.Marker({ color: '#ea4335' }))
   }, [destination])
+
+  // Read inside the focus effect without re-running it when the points change.
+  const bothPointsRef = useRef(false)
+  useEffect(() => {
+    bothPointsRef.current = origin !== null && destination !== null
+  }, [origin, destination])
+
+  useEffect(() => {
+    // A route on its way will fit the view to itself, so only pan for the
+    // first point.
+    const map = mapRef.current
+    if (!map || !focus || bothPointsRef.current) return
+    map.easeTo({ center: focus.point, zoom: Math.max(map.getZoom(), 15) })
+  }, [focus])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !showBothPoints || !origin || !destination) return
+    const bounds = new maplibregl.LngLatBounds(origin, origin).extend(destination)
+    map.fitBounds(bounds, { padding: fitPadding(map), maxZoom: 16 })
+  }, [showBothPoints, origin, destination])
 
   useEffect(() => {
     const map = mapRef.current

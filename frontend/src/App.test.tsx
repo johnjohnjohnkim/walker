@@ -81,7 +81,7 @@ describe('App', () => {
     expect(firstSignal.aborted).toBe(true)
     await act(async () => firstResolve(new Response(JSON.stringify(routeBody(2000)))))
     expect(screen.queryByText('2.0 km')).not.toBeInTheDocument()
-    expect(screen.getByText('Now click to choose a destination.')).toBeInTheDocument()
+    expect(screen.getByText('Now choose a destination.')).toBeInTheDocument()
   })
 
   it('shows the server error message', async () => {

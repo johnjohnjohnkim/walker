@@ -110,3 +110,17 @@ export async function fetchAlgorithms(signal?: AbortSignal): Promise<AlgorithmIn
   const body: { algorithms: AlgorithmInfo[] } = await response.json()
   return body.algorithms
 }
+
+export interface Place {
+  name: string
+  address: string
+  lon: number
+  lat: number
+}
+
+export async function fetchPlaces(query: string, signal?: AbortSignal): Promise<Place[]> {
+  const response = await fetch(`/api/geocode?${new URLSearchParams({ q: query })}`, { signal })
+  if (!response.ok) throw await errorFrom(response)
+  const body: { results: Place[] } = await response.json()
+  return body.results
+}

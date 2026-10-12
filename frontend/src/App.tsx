@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useReducer, useState } from 'react'
-import { type AlgorithmInfo, ApiError, fetchAlgorithms, fetchRoute, type LngLat } from './api'
+import { type AlgorithmInfo, ApiError, fetchAlgorithms, fetchRoute, type LngLat, type Place } from './api'
 import { HealthBadge } from './components/HealthBadge'
 import { MapView } from './components/MapView'
 import { RoutePanel } from './components/RoutePanel'
-import { initialRouteState, routeReducer } from './routeState'
+import { type Endpoint, initialRouteState, routeReducer } from './routeState'
 
 // Shown until the backend's list arrives, or if it can't be fetched.
 const FALLBACK_ALGORITHMS: AlgorithmInfo[] = [
@@ -21,6 +21,9 @@ const FALLBACK_ALGORITHMS: AlgorithmInfo[] = [
 export default function App() {
   const [state, dispatch] = useReducer(routeReducer, initialRouteState)
   const [algorithms, setAlgorithms] = useState<AlgorithmInfo[]>(FALLBACK_ALGORITHMS)
+  // Where the map should move to after a search result is picked. A new
+  // object each time, so picking the same place twice still moves the map.
+  const [focus, setFocus] = useState<{ point: LngLat } | null>(null)
   const { algorithm, origin, destination, status, requestId } = state
 
   useEffect(() => {
@@ -48,6 +51,11 @@ export default function App() {
 
   const handleMapClick = useCallback((point: LngLat) => dispatch({ type: 'mapClicked', point }), [])
   const handleClear = useCallback(() => dispatch({ type: 'cleared' }), [])
+  const handlePlaceSelect = useCallback((which: Endpoint, place: Place) => {
+    const point: LngLat = [place.lon, place.lat]
+    dispatch({ type: 'pointChosen', which, point, label: place.name })
+    setFocus({ point })
+  }, [])
   const handleAlgorithmChange = useCallback(
     (id: string) => dispatch({ type: 'algorithmChanged', algorithm: id }),
     [],
@@ -59,12 +67,15 @@ export default function App() {
         origin={origin}
         destination={destination}
         route={state.route?.route.coordinates ?? null}
+        focus={focus}
+        showBothPoints={status === 'error'}
         onMapClick={handleMapClick}
       />
       <RoutePanel
         state={state}
         algorithms={algorithms}
         onAlgorithmChange={handleAlgorithmChange}
+        onPlaceSelect={handlePlaceSelect}
         onClear={handleClear}
       />
       <HealthBadge />

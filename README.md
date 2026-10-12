@@ -6,7 +6,7 @@ watch how each one explores the street network.
 
 - **Backend:** Python 3.12, Django, managed with [uv](https://docs.astral.sh/uv/).
 - **Frontend:** React + TypeScript (Vite) with [MapLibre GL JS](https://maplibre.org/).
-- **Map data:** © OpenStreetMap contributors. Tiles from [OpenFreeMap](https://openfreemap.org/).
+- **Map data:** © OpenStreetMap contributors. Tiles from [OpenFreeMap](https://openfreemap.org/), place search from [Photon](https://photon.komoot.io/).
 
 ## Running locally
 
@@ -65,14 +65,19 @@ Settings come from environment variables. See `backend/.env.example` and
 | `DJANGO_SECRET_KEY` | backend | Required when debug is off. |
 | `DJANGO_ALLOWED_HOSTS` | backend | Comma-separated host names. |
 | `WALKER_GRAPH_PATH` | backend | Graph file to serve. Relative paths are relative to `backend/`. Defaults to `data/downtown.walkgraph`. |
+| `WALKER_GEOCODER` | backend | `photon`, or a dotted path to another geocoder class. |
+| `WALKER_PHOTON_URL` | backend | Photon server. Defaults to the public one. |
+| `WALKER_GEOCODE_RATE`, `WALKER_GEOCODE_RATE_WINDOW_S` | backend | Searches allowed per client per window (30 per 10 s). |
 | `VITE_MAP_STYLE_URL` | frontend | Map style JSON; swap to change tile provider. |
 | `VITE_API_PROXY_TARGET` | frontend | Where the dev server sends `/api`. |
 
 ## Using it
 
-Click the map once to set a starting point and again to set a destination.
-The walking route appears in blue with its time and distance. A third click
-starts over.
+Type a place into the starting point and destination boxes and pick a
+suggestion, or click the map: the first click sets the start, the second the
+destination, and a third starts over. The walking route appears in blue with
+its time and distance. Pick an algorithm from the chips to re-run the route
+with it.
 
 ## API
 
@@ -96,6 +101,14 @@ nodes the search visited. Errors are JSON with `error` and `code`:
 | 422 | `outside_coverage` | A point is more than 300 m from any street on the map |
 | 422 | `no_route` | The points aren't connected |
 | 503 | `graph_unavailable` | No graph is loaded |
+
+`GET /api/geocode?q=CN%20Tower` suggests places on the map (up to 8, default
+5) as `{name, address, lon, lat}`. It forwards to the configured geocoder
+(Photon by default), caches answers for a day, and allows each client 30
+searches per 10 seconds (429 `rate_limited` beyond that; 503
+`geocoder_unavailable` if the provider is down).
+
+`GET /api/algorithms` lists the search algorithms and which are implemented.
 
 `GET /api/health` reports whether a graph is loaded and its size.
 
@@ -164,6 +177,7 @@ See `backend/graph/graph.py`.
 backend/
   config/     Django settings and URLs
   algorithms/ search algorithms and the runner that checks them
+  geocoding/  place search providers (Photon), no Django imports
   graph/      the walkable graph: build from OSM, storage, nearest-node lookup
               (no Django imports)
   routing/    API views and the in-memory graph store

@@ -1,29 +1,48 @@
-import type { AlgorithmInfo } from '../api'
+import type { AlgorithmInfo, Place } from '../api'
 import { formatDistance, formatDuration } from '../format'
-import type { RouteState } from '../routeState'
+import type { Endpoint, RouteState } from '../routeState'
 import { AlgorithmPicker } from './AlgorithmPicker'
+import { SearchBox } from './SearchBox'
 
 interface Props {
   state: RouteState
   algorithms: AlgorithmInfo[]
   onAlgorithmChange: (id: string) => void
+  onPlaceSelect: (which: Endpoint, place: Place) => void
   onClear: () => void
 }
 
 function message(state: RouteState): string {
-  if (state.origin === null) return 'Click the map to choose a starting point.'
-  if (state.destination === null) return 'Now click to choose a destination.'
+  if (state.origin === null) return 'Search for a place or click the map to choose a starting point.'
+  if (state.destination === null) return 'Now choose a destination.'
   if (state.status === 'loading') return 'Finding a walking route…'
   return ''
 }
 
-export function RoutePanel({ state, algorithms, onAlgorithmChange, onClear }: Props) {
+export function RoutePanel({ state, algorithms, onAlgorithmChange, onPlaceSelect, onClear }: Props) {
   const { route, error } = state
   const hint = message(state)
 
   return (
     <section className="panel" aria-label="Directions">
       <h1 className="panel__title">Walker</h1>
+
+      <div className="panel__searches">
+        <SearchBox
+          label="Starting point"
+          placeholder="Choose starting point"
+          value={state.originLabel}
+          marker="origin"
+          onSelect={(place) => onPlaceSelect('origin', place)}
+        />
+        <SearchBox
+          label="Destination"
+          placeholder="Choose destination"
+          value={state.destinationLabel}
+          marker="destination"
+          onSelect={(place) => onPlaceSelect('destination', place)}
+        />
+      </div>
 
       <AlgorithmPicker algorithms={algorithms} selected={state.algorithm} onSelect={onAlgorithmChange} />
 

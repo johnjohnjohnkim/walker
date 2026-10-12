@@ -64,6 +64,39 @@ WSGI_APPLICATION = "config.wsgi.application"
 # the server happens to be started from.
 WALKER_GRAPH_PATH = BASE_DIR / os.environ.get("WALKER_GRAPH_PATH", "data/downtown.walkgraph")
 
+# Place search. "photon" uses the public Photon server; any other value is a
+# dotted path to a class with the same interface (see geocoding/base.py).
+WALKER_GEOCODER = os.environ.get("WALKER_GEOCODER", "photon")
+WALKER_PHOTON_URL = os.environ.get("WALKER_PHOTON_URL", "https://photon.komoot.io")
+# Public geocoders ask callers to identify themselves.
+WALKER_GEOCODER_USER_AGENT = os.environ.get(
+    "WALKER_GEOCODER_USER_AGENT", "walker/0.1 (https://github.com/johnjohnjohnkim/walker)"
+)
+# Per-client limit on /api/geocode: this many requests per window. Typing
+# with the frontend's debounce needs far fewer.
+WALKER_GEOCODE_RATE = int(os.environ.get("WALKER_GEOCODE_RATE", "10"))
+WALKER_GEOCODE_RATE_WINDOW_S = int(os.environ.get("WALKER_GEOCODE_RATE_WINDOW_S", "10"))
+# Cap on requests actually sent to the provider (cache misses), for the whole
+# process, however many clients there are: a steady rate plus a short burst.
+WALKER_GEOCODER_MAX_PER_S = float(os.environ.get("WALKER_GEOCODER_MAX_PER_S", "1"))
+WALKER_GEOCODER_BURST = int(os.environ.get("WALKER_GEOCODER_BURST", "3"))
+
+# In-process caches. Each worker process keeps its own, so with several
+# workers the limits above apply per worker (see the deploy notes).
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "default"},
+    "geocode": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "geocode",
+        "OPTIONS": {"MAX_ENTRIES": 10_000},
+    },
+    "ratelimit": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "ratelimit",
+        "OPTIONS": {"MAX_ENTRIES": 10_000},
+    },
+}
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = False

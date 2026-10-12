@@ -9,7 +9,9 @@ from django.views.decorators.http import require_GET, require_POST
 from algorithms import ALGORITHMS, REGISTRY
 from algorithms.runner import AlgorithmError, AlgorithmNotImplemented, run
 
-from . import graph_store
+from geocoding import GeocoderUnavailable
+
+from . import geocode, graph_store
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +68,44 @@ def algorithms(request):
             ]
         }
     )
+
+
+MAX_QUERY_LENGTH = 200
+MAX_RESULTS = 8
+
+
+@require_GET
+def geocode_view(request):
+    query = request.GET.get("q", "").strip()
+    if len(query) < 2:
+        return error("Type at least two characters.", "bad_request", 400)
+    if len(query) > MAX_QUERY_LENGTH:
+        return error(f"Queries are limited to {MAX_QUERY_LENGTH} characters.", "bad_request", 400)
+    try:
+        limit = min(max(int(request.GET.get("limit", 5)), 1), MAX_RESULTS)
+    except ValueError:
+        return error("`limit` must be a number.", "bad_request", 400)
+
+    # REMOTE_ADDR is the direct client. Behind a reverse proxy (M10) it must
+    # come from the proxy's forwarded header instead.
+    if not geocode.allow(request.META.get("REMOTE_ADDR", "unknown")):
+        return error("Too many searches; wait a few seconds.", "rate_limited", 429)
+
+    # Only suggest places on the map, so every suggestion can be routed to.
+    try:
+        bbox = tuple(graph_store.get().graph.meta["bbox"])
+    except (graph_store.GraphUnavailable, KeyError, TypeError):
+        bbox = geocode.TORONTO_BBOX
+
+    try:
+        places = geocode.search(query, bbox=bbox, limit=limit)
+    except geocode.Busy:
+        return error("Place search is busy; try again in a moment.", "rate_limited", 429)
+    except GeocoderUnavailable:
+        logger.warning("Geocoder unavailable", exc_info=True)
+        return error("Place search is unavailable right now. You can still click the map.", "geocoder_unavailable", 503)
+
+    return JsonResponse({"results": [place.to_json() for place in places]})
 
 
 class BadRequest(ValueError):
