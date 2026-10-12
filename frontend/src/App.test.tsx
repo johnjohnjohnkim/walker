@@ -16,6 +16,12 @@ vi.mock('./components/MapView', () => ({
   ),
 }))
 
+const ALGORITHMS = [
+  { id: 'dijkstra', name: 'Dijkstra', description: 'd', guarantee: 'shortest', uses_lengths: true, bidirectional: false, implemented: true },
+  { id: 'bfs', name: 'BFS', description: 'b', guarantee: 'fewest_edges', uses_lengths: false, bidirectional: false, implemented: true },
+  { id: 'dfs', name: 'DFS', description: 'x', guarantee: 'any', uses_lengths: false, bidirectional: false, implemented: false },
+]
+
 function routeBody(distance: number) {
   return {
     algorithm: 'dijkstra',
@@ -37,6 +43,7 @@ describe('App', () => {
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
         if (url === '/api/health') return Promise.resolve(new Response('{"status":"ok","graph":null}'))
+        if (url === '/api/algorithms') return Promise.resolve(new Response(JSON.stringify({ algorithms: ALGORITHMS })))
         signals.push(init!.signal!)
         return new Promise<Response>((resolve) => resolvers.push(resolve))
       }),
@@ -91,5 +98,27 @@ describe('App', () => {
     )
 
     expect(screen.getByRole('alert')).toHaveTextContent('The destination is too far.')
+  })
+
+  it('re-runs the search with the newly picked algorithm', async () => {
+    render(<App />)
+    const bfs = await screen.findByRole('radio', { name: 'BFS' })
+    fireEvent.click(screen.getByText('A'))
+    fireEvent.click(screen.getByText('B'))
+    await act(async () => resolvers.at(-1)!(new Response(JSON.stringify(routeBody(2000)))))
+
+    fireEvent.click(bfs)
+
+    const fetchMock = vi.mocked(fetch)
+    const lastRoute = fetchMock.mock.calls.filter(([url]) => url === '/api/route').at(-1)!
+    expect(JSON.parse(lastRoute[1]!.body as string).algorithm).toBe('bfs')
+    expect(screen.getByText('Finding a walking route…')).toBeInTheDocument()
+  })
+
+  it('disables algorithms that are not implemented', async () => {
+    render(<App />)
+
+    expect(await screen.findByRole('radio', { name: 'DFS' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: 'Dijkstra' })).toHaveAttribute('aria-checked', 'true')
   })
 })

@@ -85,4 +85,37 @@ describe('routeReducer', () => {
     expect(state).toBe(restarted)
     expect(state.route).toBeNull()
   })
+
+  it('re-runs the search when the algorithm changes with both points set', () => {
+    const done = routeReducer(click(click(initialRouteState, A), B), {
+      type: 'routeLoaded',
+      requestId: 2,
+      route: fakeRoute,
+    })
+
+    const state = routeReducer(done, { type: 'algorithmChanged', algorithm: 'bfs' })
+
+    expect(state.algorithm).toBe('bfs')
+    expect(state.status).toBe('loading')
+    expect(state.route).toBeNull()
+    expect(state.requestId).toBe(done.requestId + 1)
+  })
+
+  it('just records the algorithm before both points are set', () => {
+    const state = routeReducer(click(initialRouteState, A), { type: 'algorithmChanged', algorithm: 'bfs' })
+
+    expect(state.algorithm).toBe('bfs')
+    expect(state.status).toBe('idle')
+  })
+
+  it('keeps the algorithm when starting over or clearing', () => {
+    const picked = routeReducer(initialRouteState, { type: 'algorithmChanged', algorithm: 'bfs' })
+
+    expect(click(click(click(picked, A), B), C).algorithm).toBe('bfs')
+    expect(routeReducer(picked, { type: 'cleared' }).algorithm).toBe('bfs')
+  })
+
+  it('ignores picking the algorithm already selected', () => {
+    expect(routeReducer(initialRouteState, { type: 'algorithmChanged', algorithm: 'dijkstra' })).toBe(initialRouteState)
+  })
 })

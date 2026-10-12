@@ -38,6 +38,16 @@ export interface RouteResponse {
   }
 }
 
+export interface AlgorithmInfo {
+  id: string
+  name: string
+  description: string
+  guarantee: 'shortest' | 'fewest_edges' | 'any'
+  uses_lengths: boolean
+  bidirectional: boolean
+  implemented: boolean
+}
+
 /** An error the backend explained, with a message fit to show the user. */
 export class ApiError extends Error {
   readonly status: number
@@ -92,4 +102,11 @@ export async function fetchRoute(
   })
   if (!response.ok) throw await errorFrom(response)
   return response.json()
+}
+
+export async function fetchAlgorithms(signal?: AbortSignal): Promise<AlgorithmInfo[]> {
+  const response = await fetch('/api/algorithms', { signal })
+  if (!response.ok) throw await errorFrom(response)
+  const body: { algorithms: AlgorithmInfo[] } = await response.json()
+  return body.algorithms
 }

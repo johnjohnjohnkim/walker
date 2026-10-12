@@ -92,6 +92,7 @@ nodes the search visited. Errors are JSON with `error` and `code`:
 | Status | `code` | Meaning |
 | --- | --- | --- |
 | 400 | `bad_request`, `unknown_algorithm` | Malformed body or unknown algorithm |
+| 501 | `not_implemented` | The algorithm is still a stub |
 | 422 | `outside_coverage` | A point is more than 300 m from any street on the map |
 | 422 | `no_route` | The points aren't connected |
 | 503 | `graph_unavailable` | No graph is loaded |
@@ -100,12 +101,46 @@ nodes the search visited. Errors are JSON with `error` and `code`:
 
 ## Search algorithms
 
+| Algorithm | File | Returns | Status |
+| --- | --- | --- | --- |
+| Dijkstra | `dijkstra.py` | shortest route | done |
+| A* | `astar.py` | shortest route | to do |
+| Bidirectional Dijkstra | `bidirectional.py` | shortest route | to do |
+| BFS | `bfs.py` | fewest street segments | to do |
+| DFS | `dfs.py` | any route | to do |
+
 Each algorithm lives in `backend/algorithms/` as a generator function that
 yields events while it runs: `Discover` when a node joins the frontier,
-`Visit` when it is explored, and a final `Done` with the path. The contract,
-with a worked example, is in `backend/algorithms/events.py`. The runner checks
-every result: the path must start and end at the right nodes and use real
-edges, and its length is measured from the graph rather than trusted.
+`Visit` when it is explored, and a final `Done` with the path. The rules, with
+worked examples, are in `backend/algorithms/events.py`. The runner checks
+every event and the final path, so a mistake shows up as a clear error rather
+than a wrong line on the map.
+
+### Writing one
+
+1. Open the algorithm's file. Its docstring says what it must return and what
+   tends to go wrong; the function body is a stub that raises
+   `NotImplementedError`.
+2. Replace the stub with your implementation. Read `dijkstra.py` for how the
+   events are reported.
+3. Check it:
+
+   ```sh
+   cd backend
+   uv run pytest tests/test_conformance.py -k bfs -v
+   ```
+
+   The conformance tests run it on small hand-built graphs (including traps
+   for common mistakes), on random graphs and on real downtown routes, and
+   compare the answer with NetworkX. Every test graph is drawn to scale at
+   Toronto's latitude, with no edge shorter than a straight line, so a
+   correct straight-line heuristic for A* is never penalised. While the stub is in place these tests
+   are skipped.
+4. Reload the page. The picker enables an algorithm as soon as it stops
+   raising `NotImplementedError`; the dev server picks up the change on save,
+   and the page asks for the list of algorithms when it loads.
+
+`GET /api/algorithms` lists every algorithm and whether it is implemented.
 
 ## The graph
 

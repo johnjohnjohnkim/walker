@@ -13,8 +13,10 @@ from routing import graph_store
 #
 # with every street walkable in both directions.
 GRID_ORIGIN = (-79.3800, 43.6480)
-GRID_STEP_LON = 0.00124  # about 100 m at this latitude
-GRID_STEP_LAT = 0.0009  # about 100 m
+# Slightly under 100 m apart, so the 100 m edges are never shorter than the
+# straight line between their ends (A* depends on that; see geo.py).
+GRID_STEP_LON = 0.00124  # 99.7 m at this latitude
+GRID_STEP_LAT = 0.00089  # 99.0 m
 
 
 def grid_coords() -> list[tuple[float, float]]:

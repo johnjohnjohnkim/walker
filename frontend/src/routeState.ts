@@ -4,6 +4,7 @@
 import type { LngLat, RouteResponse } from './api'
 
 export type RouteState = {
+  algorithm: string
   origin: LngLat | null
   destination: LngLat | null
   status: 'idle' | 'loading' | 'done' | 'error'
@@ -17,10 +18,12 @@ export type RouteState = {
 export type RouteAction =
   | { type: 'mapClicked'; point: LngLat }
   | { type: 'cleared' }
+  | { type: 'algorithmChanged'; algorithm: string }
   | { type: 'routeLoaded'; requestId: number; route: RouteResponse }
   | { type: 'routeFailed'; requestId: number; error: string }
 
 export const initialRouteState: RouteState = {
+  algorithm: 'dijkstra',
   origin: null,
   destination: null,
   status: 'idle',
@@ -37,7 +40,12 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
       // Starting over gets a new requestId too, so an answer for the old pair
       // of points that is already on its way is recognised as stale.
       if (state.origin === null || state.destination !== null) {
-        return { ...initialRouteState, origin: action.point, requestId: state.requestId + 1 }
+        return {
+          ...initialRouteState,
+          algorithm: state.algorithm,
+          origin: action.point,
+          requestId: state.requestId + 1,
+        }
       }
       return {
         ...state,
@@ -48,7 +56,21 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
         requestId: state.requestId + 1,
       }
     case 'cleared':
-      return { ...initialRouteState, requestId: state.requestId + 1 }
+      return { ...initialRouteState, algorithm: state.algorithm, requestId: state.requestId + 1 }
+    case 'algorithmChanged':
+      if (action.algorithm === state.algorithm) return state
+      // With both points chosen, switching algorithm re-runs the search.
+      if (state.origin !== null && state.destination !== null) {
+        return {
+          ...state,
+          algorithm: action.algorithm,
+          status: 'loading',
+          route: null,
+          error: null,
+          requestId: state.requestId + 1,
+        }
+      }
+      return { ...state, algorithm: action.algorithm }
     case 'routeLoaded':
       if (action.requestId !== state.requestId || state.status !== 'loading') return state
       return { ...state, status: 'done', route: action.route, error: null }

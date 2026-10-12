@@ -1,8 +1,12 @@
+import type { AlgorithmInfo } from '../api'
 import { formatDistance, formatDuration } from '../format'
 import type { RouteState } from '../routeState'
+import { AlgorithmPicker } from './AlgorithmPicker'
 
 interface Props {
   state: RouteState
+  algorithms: AlgorithmInfo[]
+  onAlgorithmChange: (id: string) => void
   onClear: () => void
 }
 
@@ -13,13 +17,15 @@ function message(state: RouteState): string {
   return ''
 }
 
-export function RoutePanel({ state, onClear }: Props) {
+export function RoutePanel({ state, algorithms, onAlgorithmChange, onClear }: Props) {
   const { route, error } = state
   const hint = message(state)
 
   return (
     <section className="panel" aria-label="Directions">
       <h1 className="panel__title">Walker</h1>
+
+      <AlgorithmPicker algorithms={algorithms} selected={state.algorithm} onSelect={onAlgorithmChange} />
 
       {hint && <p className="panel__hint">{hint}</p>}
 
@@ -28,7 +34,7 @@ export function RoutePanel({ state, onClear }: Props) {
           <span className="panel__duration">{formatDuration(route.route.duration_s)}</span>
           <span className="panel__distance">{formatDistance(route.route.distance_m)}</span>
           <p className="panel__meta">
-            {route.algorithm} explored {route.search.visited.toLocaleString('en-US')} intersections
+            {algorithms.find((a) => a.id === route.algorithm)?.name ?? route.algorithm} explored {route.search.visited.toLocaleString('en-US')} intersections
           </p>
         </div>
       )}

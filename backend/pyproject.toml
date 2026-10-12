@@ -15,6 +15,7 @@ build = [
 dev = [
     "pytest>=9.1.1",
     "pytest-django>=4.14.0",
+    "pytest-timeout>=2.4.0",
     { include-group = "build" },
 ]
 
@@ -24,3 +25,6 @@ package = false
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.test_settings"
 testpaths = ["tests"]
+# An algorithm stuck in a loop that never yields can't be stopped by the
+# runner, so stop the test instead of hanging the whole run.
+timeout = 30

@@ -135,3 +135,47 @@ body {
   background: var(--surface);
   cursor: pointer;
 }
+
+.picker {
+  margin-bottom: 12px;
+}
+
+.picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.picker__chip {
+  padding: 6px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.picker__chip:hover:not(:disabled) {
+  background: #f1f3f4;
+}
+
+.picker__chip--selected,
+.picker__chip--selected:hover:not(:disabled) {
+  border-color: transparent;
+  background: #e8f0fe;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.picker__chip:disabled {
+  color: #bdc1c6;
+  cursor: not-allowed;
+}
+
+.picker__description {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}

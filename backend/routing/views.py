@@ -6,7 +6,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
-from algorithms import ALGORITHMS
+from algorithms import ALGORITHMS, REGISTRY
 from algorithms.runner import AlgorithmError, AlgorithmNotImplemented, run
 
 from . import graph_store
@@ -44,6 +44,26 @@ def health(request):
                 "edges": graph.edge_count,
                 "built_at": graph.meta.get("built_at"),
             },
+        }
+    )
+
+
+@require_GET
+def algorithms(request):
+    return JsonResponse(
+        {
+            "algorithms": [
+                {
+                    "id": a.id,
+                    "name": a.name,
+                    "description": a.description,
+                    "guarantee": a.guarantee,
+                    "uses_lengths": a.uses_lengths,
+                    "bidirectional": a.bidirectional,
+                    "implemented": a.implemented,
+                }
+                for a in REGISTRY
+            ]
         }
     )
 
