@@ -2,6 +2,7 @@
 MILESTONES.md
 journal/
 deploy/deploy-guide.pdf
+deploy/push-to-prod-guide.pdf
 
 # Secrets and local overrides
 .env
