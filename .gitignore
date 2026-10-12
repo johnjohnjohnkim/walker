@@ -1,0 +1,26 @@
+# Local planning and work notes
+MILESTONES.md
+journal/
+
+# Secrets and local overrides
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Built graph files (rebuild with the graph build command)
+backend/data/
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/

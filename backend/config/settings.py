@@ -1,0 +1,65 @@
+"""
+Django settings for the Walker backend.
+
+Every value that differs between machines comes from the environment, so the
+same code runs locally and in production. Copy `.env.example` to `.env` for
+local development.
+"""
+
+import os
+from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Test settings set WALKER_SKIP_DOTENV so a developer's local .env never
+# changes what the tests see.
+if not os.environ.get("WALKER_SKIP_DOTENV"):
+    load_dotenv(BASE_DIR / ".env")
+
+
+def env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: str) -> list[str]:
+    return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
+
+
+# Off unless explicitly enabled, so a deploy that forgets the variable fails
+# safe. `.env.example` turns it on for local development.
+DEBUG = env_bool("DJANGO_DEBUG", False)
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is off.")
+    SECRET_KEY = "dev-only-insecure-key"
+
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+
+# The API is a stateless JSON service, so the session, auth and admin apps
+# are left out on purpose. There is no database either: routing data lives
+# in an in-memory graph.
+INSTALLED_APPS = [
+    "routing",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.middleware.common.CommonMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+
+WSGI_APPLICATION = "config.wsgi.application"
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = False
+USE_TZ = True

@@ -1,0 +1,58 @@
+:root {
+  --surface: #ffffff;
+  --text: #202124;
+  --text-muted: #5f6368;
+  --ok: #188038;
+  --down: #d93025;
+  --shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+
+  font-family: Roboto, Arial, system-ui, sans-serif;
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--surface);
+}
+
+.app {
+  position: relative;
+  height: 100%;
+}
+
+/* MapLibre's stylesheet sets `position: relative` on the map container, so
+   size it explicitly instead of relying on absolute positioning. */
+.map {
+  width: 100%;
+  height: 100%;
+}
+
+.health-badge {
+  position: absolute;
+  bottom: 24px;
+  left: 16px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.health-badge--ok {
+  color: var(--ok);
+}
+
+.health-badge--down {
+  color: var(--down);
+}
