@@ -39,3 +39,22 @@ def test_distances_match_networkx(graphs):
 
         expected = nx.dijkstra_path_length(reference, start, goal)
         assert result.distance_m == pytest.approx(expected)
+
+
+def test_trace_parents_rebuild_the_returned_path(graphs):
+    """The animation's tree leads to exactly the route that is drawn."""
+    from algorithms.runner import DISCOVER
+
+    graph, _ = graphs
+    rng = random.Random(3)
+    for _ in range(10):
+        start, goal = rng.randrange(graph.node_count), rng.randrange(graph.node_count)
+        result = run(dijkstra.search, graph, start, goal, record=True)
+        parent = {}
+        for code, node, par in zip(result.trace.codes, result.trace.nodes, result.trace.parents):
+            if code == DISCOVER:
+                parent[node] = par
+        path = [goal]
+        while parent[path[-1]] != -1:
+            path.append(parent[path[-1]])
+        assert path[::-1] == result.path

@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { type AlgorithmInfo, ApiError, fetchAlgorithms, fetchRoute, type LngLat, type Place } from './api'
 import { HealthBadge } from './components/HealthBadge'
 import { MapView } from './components/MapView'
+import { PlaybackBar } from './components/PlaybackBar'
 import { RoutePanel } from './components/RoutePanel'
 import { type Endpoint, initialRouteState, routeReducer } from './routeState'
+import { decodeTrace } from './trace'
+import { usePlayback } from './usePlayback'
 
 // Shown until the backend's list arrives, or if it can't be fetched.
 const FALLBACK_ALGORITHMS: AlgorithmInfo[] = [
@@ -49,6 +52,11 @@ export default function App() {
     return () => controller.abort()
   }, [algorithm, origin, destination, status, requestId])
 
+  // Decoded once per route; the animation then only moves `playback.step`.
+  const trace = useMemo(() => (state.route?.trace ? decodeTrace(state.route.trace) : null), [state.route])
+  const playback = usePlayback(trace?.steps ?? 0, trace)
+  const algorithmName = algorithms.find((a) => a.id === state.route?.algorithm)?.name ?? state.route?.algorithm ?? ''
+
   const handleMapClick = useCallback((point: LngLat) => dispatch({ type: 'mapClicked', point }), [])
   const handleClear = useCallback(() => dispatch({ type: 'cleared' }), [])
   const handlePlaceSelect = useCallback((which: Endpoint, place: Place) => {
@@ -67,6 +75,9 @@ export default function App() {
         origin={origin}
         destination={destination}
         route={state.route?.route.coordinates ?? null}
+        trace={trace}
+        traceStep={playback.step}
+        routeVisible={trace === null || playback.finished}
         focus={focus}
         showBothPoints={status === 'error'}
         onMapClick={handleMapClick}
@@ -78,6 +89,7 @@ export default function App() {
         onPlaceSelect={handlePlaceSelect}
         onClear={handleClear}
       />
+      {trace && <PlaybackBar trace={trace} playback={playback} algorithmName={algorithmName} />}
       <HealthBadge />
     </div>
   )

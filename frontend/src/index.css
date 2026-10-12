@@ -293,3 +293,84 @@ body {
 .search__note--error {
   color: var(--down);
 }
+
+.playback {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  width: min(640px, calc(100% - 32px));
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+
+.playback__play {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.playback__scrubber {
+  flex: 1;
+  min-width: 160px;
+  accent-color: #9334e6;
+}
+
+.playback__label {
+  flex-basis: 100%;
+  order: 3;
+  color: var(--text-muted);
+}
+
+.playback__speeds {
+  display: flex;
+  gap: 2px;
+}
+
+.playback__speed,
+.playback__skip {
+  padding: 4px 8px;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.playback__speed--selected {
+  border-color: transparent;
+  background: #e8f0fe;
+  color: var(--accent);
+}
+
+/* Phones: the panel spans the top, so the badge sits just above the
+   playback bar on the left, and the bar keeps clear of the map's
+   attribution (which must stay visible) and its zoom buttons, which pinch
+   zoom makes unnecessary on touch screens. */
+@media (max-width: 700px) {
+  /* The attribution wraps onto two lines at phone width. */
+  .playback {
+    bottom: 60px;
+  }
+
+  .health-badge {
+    bottom: 175px;
+  }
+
+  .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group {
+    display: none;
+  }
+}

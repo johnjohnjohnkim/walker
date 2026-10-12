@@ -177,3 +177,81 @@ def test_deeply_nested_json_is_rejected(client, graph_file):
     response = client.post("/api/route", data="[" * 100_000, content_type="application/json")
 
     assert response.status_code == 400
+
+
+def test_no_trace_unless_asked(client, graph_file):
+    response = post(client, {"origin": point(0, 0), "destination": point(2, 2)})
+
+    assert response.json()["trace"] is None
+
+
+def test_trace_lists_every_event_compactly(client, graph_file):
+    response = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True})
+
+    body = response.json()
+    trace = body["trace"]
+    events = trace["events"]
+    assert len(events) == 3 * trace["count"]
+    assert trace["truncated"] is False
+    # Each node appears once in the coordinate table, and every index is valid.
+    assert len(trace["coordinates"]) == len({tuple(c) for c in trace["coordinates"]})
+    indexes = events[1::3] + [p for p in events[2::3] if p != -1]
+    assert all(0 <= i < len(trace["coordinates"]) for i in indexes)
+    # It starts by discovering then visiting the snapped origin.
+    assert events[:6] == [0, 0, -1, 1, 0, -1]
+    assert trace["coordinates"][0] == body["origin"]["snapped"]
+    # Visits match the reported count.
+    assert events[0::3].count(1) == body["search"]["visited"]
+
+
+def test_trace_is_cut_short_past_the_limit(client, graph_file, monkeypatch):
+    from routing import views
+
+    monkeypatch.setattr(views, "MAX_TRACE_EVENTS", 4)
+
+    trace = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True}).json()["trace"]
+
+    assert trace["count"] == 4
+    assert len(trace["events"]) == 12
+    assert trace["truncated"] is True
+
+
+def test_trace_flag_must_be_boolean(client, graph_file):
+    response = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": "yes"})
+
+    assert response.status_code == 400
+
+
+def test_large_responses_are_compressed(client, graph_file):
+    response = client.post(
+        "/api/route",
+        data=json.dumps({"origin": point(0, 0), "destination": point(2, 2), "trace": True}),
+        content_type="application/json",
+        HTTP_ACCEPT_ENCODING="gzip",
+    )
+
+    assert response["Content-Encoding"] == "gzip"
+
+
+def test_trace_ends_on_the_returned_route(client, graph_file):
+    """Following each node's last discovered parent back from the goal gives
+    the route that was drawn, so the animation finishes on the same path."""
+    body = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True}).json()
+    trace = body["trace"]
+    coords = trace["coordinates"]
+    events = trace["events"]
+    parent = {}
+    for i in range(trace["count"]):
+        code, node, par = events[3 * i : 3 * i + 3]
+        if code == 0:
+            parent[node] = par
+
+    goal = coords.index(body["destination"]["snapped"])
+    path = [goal]
+    while parent[path[-1]] != -1:
+        path.append(parent[path[-1]])
+    traced = [coords[i] for i in reversed(path)]
+
+    route = body["route"]["coordinates"]
+    # The grid has no curved streets, so the route is exactly the node chain.
+    assert traced == route

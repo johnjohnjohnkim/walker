@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { routeLayerPosition } from './mapLayers'
+import { exploredColor, routeLayerPosition } from './mapLayers'
 
 describe('routeLayerPosition', () => {
   it('goes under the first label layer', () => {
@@ -23,5 +23,17 @@ describe('routeLayerPosition', () => {
 
   it('goes on top when there are no labels above the buildings', () => {
     expect(routeLayerPosition([{ id: 'building-3d', type: 'fill-extrusion' }])).toBeUndefined()
+  })
+})
+
+describe('exploredColor', () => {
+  it('fades each side from light to dark over the whole search', () => {
+    const expression = exploredColor(500) as unknown[]
+    expect(expression[0]).toBe('match')
+    expect(expression[4]).toEqual(['interpolate', ['linear'], ['get', 't'], 0, '#d7aefb', 500, '#5b1f99'])
+  })
+
+  it('never uses an empty range', () => {
+    expect((exploredColor(0) as unknown[])[4]).toContain(1)
   })
 })

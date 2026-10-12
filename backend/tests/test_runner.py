@@ -167,3 +167,53 @@ def test_rejects_paths_that_are_not_lists_of_ints(grid_graph, path):
 def test_rejects_paths_through_missing_nodes(grid_graph):
     with pytest.raises(AlgorithmError, match="not in the graph"):
         run(scripted(Done([0, 99, 1])), grid_graph, 0, 1)
+
+
+def test_records_a_trace_only_when_asked(grid_graph):
+    from algorithms import dijkstra
+    from algorithms.runner import DISCOVER, VISIT
+
+    plain = run(dijkstra.search, grid_graph, 0, 2)
+    recorded = run(dijkstra.search, grid_graph, 0, 2, record=True)
+
+    assert plain.trace is None
+    trace = recorded.trace
+    assert len(trace) == len(trace.nodes) == len(trace.parents)
+    assert (trace.codes[0], trace.nodes[0], trace.parents[0]) == (DISCOVER, 0, -1)
+    assert (trace.codes[1], trace.nodes[1], trace.parents[1]) == (VISIT, 0, -1)
+    assert recorded.path == plain.path
+
+
+def test_trace_marks_backward_events():
+    from algorithms.runner import DISCOVER, DISCOVER_BACKWARD, VISIT, VISIT_BACKWARD
+
+    events = [
+        Discover(0, None),
+        Discover(2, None, "backward"),
+        Visit(0),
+        Discover(1, 0),
+        Visit(2, "backward"),
+        Discover(1, 2, "backward"),
+        Done([0, 1, 2]),
+    ]
+    graph = WalkGraph.from_edges([(0, 0), (1, 0), (2, 0)], [(0, 1, 1.0), (1, 0, 1.0), (1, 2, 1.0), (2, 1, 1.0)])
+
+    trace = run(scripted(*events), graph, 0, 2, record=True).trace
+
+    assert list(trace.codes) == [DISCOVER, DISCOVER_BACKWARD, VISIT, DISCOVER, VISIT_BACKWARD, DISCOVER_BACKWARD]
+    assert list(trace.parents) == [-1, -1, -1, 0, -1, 2]
+
+
+def test_recording_stops_at_the_limit_but_counting_does_not(grid_graph):
+    from algorithms import dijkstra
+
+    full = run(dijkstra.search, grid_graph, 0, 8, record=True)
+    capped = run(dijkstra.search, grid_graph, 0, 8, record=True, record_limit=5)
+    exact = run(dijkstra.search, grid_graph, 0, 8, record=True, record_limit=len(full.trace))
+
+    assert len(capped.trace) == 5
+    assert capped.trace.total == len(full.trace)
+    assert capped.trace.truncated
+    assert not exact.trace.truncated
+    assert not full.trace.truncated
+    assert list(capped.trace.nodes) == list(full.trace.nodes)[:5]

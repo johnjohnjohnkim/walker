@@ -75,8 +75,15 @@ Settings come from environment variables. See `backend/.env.example` and
 
 Type a place into the starting point and destination boxes and pick a
 suggestion, or click the map: the first click sets the start, the second the
-destination, and a third starts over. The walking route appears in blue with
-its time and distance. Pick an algorithm from the chips to re-run the route
+destination, and a third starts over. The search then plays out on the
+map: every street segment it reaches is drawn as it happens, light at first
+and darker later, with the two halves of a bidirectional search in purple and
+orange. Pause, scrub, change speed or skip with the bar at the bottom. When
+it finishes, the walking route appears in blue with its time and distance
+(scrub back and it hides again until the search reaches the end). Explored
+streets are drawn as straight lines between intersections to keep the
+animation light; the route follows the real street shapes. If your system is
+set to reduce motion, searches open already finished and you can press play. Pick an algorithm from the chips to re-run the route
 with it.
 
 ## API
@@ -101,6 +108,15 @@ nodes the search visited. Errors are JSON with `error` and `code`:
 | 422 | `outside_coverage` | A point is more than 300 m from any street on the map |
 | 422 | `no_route` | The points aren't connected |
 | 503 | `graph_unavailable` | No graph is loaded |
+
+Add `"trace": true` to get every step of the search for the animation, as
+`trace: {coordinates, events, count, truncated}`. `coordinates` lists each
+node the search touched once; `events` holds three numbers per step: what
+happened (0 discover, 1 visit, 2 and 3 the same for the backward half of a
+bidirectional search), the node's index in `coordinates`, and its parent's
+index (-1 for none). The worst downtown case, Dijkstra from corner to corner,
+is 34,531 steps: about 900 KB of JSON, 220 KB gzipped, built in under 0.1 s.
+Traces over 200,000 steps are cut short and marked `truncated`.
 
 `GET /api/geocode?q=CN%20Tower` suggests places on the map (up to 8, default
 5) as `{name, address, lon, lat}`. It forwards to the configured geocoder

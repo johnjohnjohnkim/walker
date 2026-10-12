@@ -14,6 +14,7 @@ own request timeout (gunicorn --timeout) is the backstop for that case.
 from __future__ import annotations
 
 import time
+from array import array
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
@@ -43,6 +44,34 @@ class AlgorithmNotImplemented(AlgorithmError):
     """The algorithm is still a stub."""
 
 
+# Event codes in a recorded trace: what happened, and on which side.
+DISCOVER, VISIT, DISCOVER_BACKWARD, VISIT_BACKWARD = 0, 1, 2, 3
+
+
+@dataclass(frozen=True)
+class Trace:
+    """Every event of a search, in order, as three parallel arrays.
+
+    For event i: `codes[i]` is one of the codes above, `nodes[i]` the node,
+    and `parents[i]` the parent for a discovery (-1 for none, and for visits).
+    Plain arrays keep a 50,000-event trace to a few hundred kilobytes.
+    """
+
+    codes: array
+    nodes: array
+    parents: array
+    # How many events the search really had; more than len(self) when
+    # recording stopped at its limit.
+    total: int
+
+    def __len__(self) -> int:
+        return len(self.codes)
+
+    @property
+    def truncated(self) -> bool:
+        return self.total > len(self)
+
+
 @dataclass(frozen=True)
 class SearchResult:
     path: list[int] | None
@@ -52,6 +81,8 @@ class SearchResult:
     # Distinct nodes ever placed on the frontier (per side), however many
     # times each was rediscovered.
     discovered: int
+    # Only when run with record=True.
+    trace: Trace | None = None
 
 
 def run(
@@ -61,8 +92,17 @@ def run(
     goal: int,
     *,
     time_limit_s: float = DEFAULT_TIME_LIMIT_S,
+    record: bool = False,
+    record_limit: int | None = None,
 ) -> SearchResult:
+    """Run `search` from start to goal, checking every event.
+
+    With `record`, also keep the events for the animation, at most
+    `record_limit` of them. Leave it off when timing an algorithm, since
+    recording adds its own cost.
+    """
     checker = _TraceChecker(graph, start, goal)
+    codes, nodes, parents = (array("b"), array("i"), array("i")) if record else (None, None, None)
     limit = max_events(graph)
     deadline = time.monotonic() + time_limit_s
     done: Done | None = None
@@ -79,8 +119,17 @@ def run(
                 raise AlgorithmError(f"took longer than {time_limit_s:g} s")
             if isinstance(event, Done):
                 done = event
-            else:
-                checker.check(event)
+                continue
+            checker.check(event)
+            if codes is not None and (record_limit is None or len(codes) < record_limit):
+                backward = event.side == "backward"
+                if isinstance(event, Discover):
+                    codes.append(DISCOVER_BACKWARD if backward else DISCOVER)
+                    parents.append(-1 if event.parent is None else event.parent)
+                else:
+                    codes.append(VISIT_BACKWARD if backward else VISIT)
+                    parents.append(-1)
+                nodes.append(event.node)
     except AlgorithmError:
         raise
     except NotImplementedError as exc:
@@ -95,7 +144,11 @@ def run(
 
     path = done.path
     distance = None if path is None else path_length(graph, path, start, goal)
-    return SearchResult(path=path, distance_m=distance, visited=checker.visited, discovered=checker.discovered)
+    events = count - 1  # every counted event except Done
+    trace = Trace(codes, nodes, parents, total=events) if codes is not None else None
+    return SearchResult(
+        path=path, distance_m=distance, visited=checker.visited, discovered=checker.discovered, trace=trace
+    )
 
 
 class _TraceChecker:

@@ -36,6 +36,20 @@ export interface RouteResponse {
     visited: number
     discovered: number
   }
+  trace: TracePayload | null
+}
+
+/**
+ * Every event of the search, compactly (see backend/routing/views.py).
+ * `events` holds three numbers per event: code (0 discover, 1 visit,
+ * 2 discover backward, 3 visit backward), node index into `coordinates`,
+ * and parent index (-1 for none).
+ */
+export interface TracePayload {
+  coordinates: LngLat[]
+  events: number[]
+  count: number
+  truncated: boolean
 }
 
 export interface AlgorithmInfo {
@@ -97,6 +111,7 @@ export async function fetchRoute(
       origin: { lon: origin[0], lat: origin[1] },
       destination: { lon: destination[0], lat: destination[1] },
       algorithm,
+      trace: true,
     }),
     signal,
   })

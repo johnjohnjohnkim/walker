@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { fetchHealth, type HealthResponse } from '../api'
 
 type State = { kind: 'checking' } | { kind: 'down' } | { kind: 'up'; health: HealthResponse }
@@ -16,7 +16,7 @@ function tone(state: State): 'checking' | 'ok' | 'down' {
   return state.kind === 'up' && state.health.status === 'ok' ? 'ok' : 'down'
 }
 
-export function HealthBadge() {
+export const HealthBadge = memo(function HealthBadge() {
   const [state, setState] = useState<State>({ kind: 'checking' })
 
   useEffect(() => {
@@ -37,4 +37,4 @@ export function HealthBadge() {
       {label(state)}
     </div>
   )
-}
+})

@@ -24,6 +24,7 @@ describe('fetchRoute', () => {
       origin: { lon: -79.38, lat: 43.65 },
       destination: { lon: -79.39, lat: 43.66 },
       algorithm: 'dijkstra',
+      trace: true,
     })
   })
 

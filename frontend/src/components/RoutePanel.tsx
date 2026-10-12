@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { AlgorithmInfo, Place } from '../api'
 import { formatDistance, formatDuration } from '../format'
 import type { Endpoint, RouteState } from '../routeState'
@@ -19,7 +20,15 @@ function message(state: RouteState): string {
   return ''
 }
 
-export function RoutePanel({ state, algorithms, onAlgorithmChange, onPlaceSelect, onClear }: Props) {
+// Memoized: the animation re-renders App every frame, but this panel's
+// props only change when the route state does.
+export const RoutePanel = memo(function RoutePanel({
+  state,
+  algorithms,
+  onAlgorithmChange,
+  onPlaceSelect,
+  onClear,
+}: Props) {
   const { route, error } = state
   const hint = message(state)
 
@@ -71,4 +80,4 @@ export function RoutePanel({ state, algorithms, onAlgorithmChange, onPlaceSelect
       )}
     </section>
   )
-}
+})

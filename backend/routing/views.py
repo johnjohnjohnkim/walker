@@ -133,7 +133,7 @@ def _parse_point(body: dict, key: str) -> tuple[float, float]:
     return values[0], values[1]
 
 
-def _parse_route_request(request) -> tuple[tuple[float, float], tuple[float, float], str]:
+def _parse_route_request(request) -> tuple[tuple[float, float], tuple[float, float], str, bool]:
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as exc:
@@ -144,7 +144,48 @@ def _parse_route_request(request) -> tuple[tuple[float, float], tuple[float, flo
     algorithm = body.get("algorithm", "dijkstra")
     if not isinstance(algorithm, str):
         raise BadRequest("`algorithm` must be a string.")
-    return _parse_point(body, "origin"), _parse_point(body, "destination"), algorithm
+    trace = body.get("trace", False)
+    if not isinstance(trace, bool):
+        raise BadRequest("`trace` must be true or false.")
+    return _parse_point(body, "origin"), _parse_point(body, "destination"), algorithm, trace
+
+
+# Beyond this many events the animation is cut short rather than recording
+# and sending megabytes. Downtown searches stay far below it (about 35,000 at
+# most); the whole-city graph (M9) needs a decision on a binary encoding or
+# sampling before raising it.
+MAX_TRACE_EVENTS = 200_000
+
+
+def _trace_payload(graph, trace) -> dict:
+    """The search's events for the animation, compactly.
+
+    `coordinates` lists each node the search touched once, as [lon, lat].
+    `events` is a flat list of three numbers per event: the event code
+    (0 discover, 1 visit, 2 discover backward, 3 visit backward), the node's
+    index in `coordinates`, and its parent's index (-1 if none).
+    """
+    count = len(trace)
+    index: dict[int, int] = {}
+    coordinates: list[list[float]] = []
+
+    def local(node: int) -> int:
+        if node < 0:
+            return -1
+        i = index.get(node)
+        if i is None:
+            i = index[node] = len(coordinates)
+            lon, lat = graph.coord(node)
+            coordinates.append([round(lon, 6), round(lat, 6)])
+        return i
+
+    events: list[int] = []
+    codes, nodes, parents = trace.codes, trace.nodes, trace.parents
+    for i in range(count):
+        events.append(codes[i])
+        events.append(local(nodes[i]))
+        events.append(local(parents[i]))
+    return {"coordinates": coordinates, "events": events, "count": count, "truncated": trace.truncated}
 
 
 def _rounded(points):
@@ -156,7 +197,7 @@ def _rounded(points):
 @require_POST
 def route(request):
     try:
-        origin, destination, algorithm = _parse_route_request(request)
+        origin, destination, algorithm, want_trace = _parse_route_request(request)
     except BadRequest as exc:
         return error(str(exc), "bad_request", 400)
 
@@ -185,7 +226,7 @@ def route(request):
     start, start_offset = snapped["origin"]
     goal, goal_offset = snapped["destination"]
     try:
-        result = run(search, graph, start, goal)
+        result = run(search, graph, start, goal, record=want_trace, record_limit=MAX_TRACE_EVENTS)
     except AlgorithmNotImplemented:
         return error(f"The {algorithm} algorithm hasn't been implemented yet.", "not_implemented", 501)
     except AlgorithmError as exc:
@@ -220,6 +261,7 @@ def route(request):
                 "visited": result.visited,
                 "discovered": result.discovered,
             },
+            "trace": _trace_payload(graph, result.trace) if result.trace is not None else None,
         }
     )
 
