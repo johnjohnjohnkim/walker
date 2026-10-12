@@ -10,6 +10,9 @@ x-logging: &logging
 
 services:
   backend:
+    # Built here with --build, or pulled from GitHub's registry by the
+    # pipeline (see .github/workflows/ci.yml).
+    image: ghcr.io/johnjohnjohnkim/walker-backend:latest
     build: ./backend
     env_file: deploy/.env
     environment:
@@ -27,6 +30,7 @@ services:
       start_period: 20s
 
   web:
+    image: ghcr.io/johnjohnjohnkim/walker-web:latest
     build: ./frontend
     # One settings file for both boxes keeps setup simple. Caddy only reads
     # WALKER_DOMAIN from it.
