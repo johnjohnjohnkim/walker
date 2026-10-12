@@ -10,7 +10,11 @@ interface Props {
   algorithms: AlgorithmInfo[]
   onAlgorithmChange: (id: string) => void
   onPlaceSelect: (which: Endpoint, place: Place) => void
+  onSwap: () => void
+  comparing: boolean
+  onCompare: () => void
   onClear: () => void
+  compareButtonRef?: React.Ref<HTMLButtonElement>
 }
 
 function message(state: RouteState): string {
@@ -27,13 +31,22 @@ export const RoutePanel = memo(function RoutePanel({
   algorithms,
   onAlgorithmChange,
   onPlaceSelect,
+  onSwap,
+  comparing,
+  onCompare,
   onClear,
+  compareButtonRef,
 }: Props) {
   const { route, error } = state
   const hint = message(state)
 
   return (
-    <section className="panel" aria-label="Directions">
+    <section className="panel" aria-label="Directions" aria-busy={state.status === 'loading'}>
+      {state.status === 'loading' && (
+        <div className="panel__progress-track" aria-hidden="true">
+          <div className="panel__progress" />
+        </div>
+      )}
       <h1 className="panel__title">Walker</h1>
 
       <div className="panel__searches">
@@ -51,6 +64,16 @@ export const RoutePanel = memo(function RoutePanel({
           marker="destination"
           onSelect={(place) => onPlaceSelect('destination', place)}
         />
+        <button
+          type="button"
+          className="panel__swap"
+          onClick={onSwap}
+          disabled={state.origin === null && state.destination === null}
+          aria-label="Swap starting point and destination"
+          title="Swap starting point and destination"
+        >
+          ⇅
+        </button>
       </div>
 
       <AlgorithmPicker algorithms={algorithms} selected={state.algorithm} onSelect={onAlgorithmChange} />
@@ -73,11 +96,25 @@ export const RoutePanel = memo(function RoutePanel({
         </p>
       )}
 
-      {state.origin !== null && (
-        <button type="button" className="panel__clear" onClick={onClear}>
-          Clear
-        </button>
-      )}
+      <div className="panel__actions">
+        {state.status === 'done' && (
+          <button
+            ref={compareButtonRef}
+            type="button"
+            className="panel__button"
+            aria-expanded={comparing}
+            aria-controls={comparing ? 'comparison' : undefined}
+            onClick={onCompare}
+          >
+            {comparing ? 'Hide comparison' : 'Compare algorithms'}
+          </button>
+        )}
+        {(state.origin !== null || state.destination !== null) && (
+          <button type="button" className="panel__button" onClick={onClear}>
+            Clear
+          </button>
+        )}
+      </div>
     </section>
   )
 })

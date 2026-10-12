@@ -118,4 +118,30 @@ describe('routeReducer', () => {
   it('ignores picking the algorithm already selected', () => {
     expect(routeReducer(initialRouteState, { type: 'algorithmChanged', algorithm: 'dijkstra' })).toBe(initialRouteState)
   })
+
+  it('swaps the two ends and searches again', () => {
+    const chosen = routeReducer(click(initialRouteState, A), {
+      type: 'pointChosen',
+      which: 'destination',
+      point: B,
+      label: 'Union Station',
+    })
+
+    const swapped = routeReducer(chosen, { type: 'swapped' })
+
+    expect(swapped.origin).toEqual(B)
+    expect(swapped.originLabel).toBe('Union Station')
+    expect(swapped.destination).toEqual(A)
+    expect(swapped.destinationLabel).toBe('Dropped pin')
+    expect(swapped.status).toBe('loading')
+    expect(swapped.requestId).toBe(chosen.requestId + 1)
+  })
+
+  it('swaps a lone point to the other end', () => {
+    const swapped = routeReducer(click(initialRouteState, A), { type: 'swapped' })
+
+    expect(swapped.origin).toBeNull()
+    expect(swapped.destination).toEqual(A)
+    expect(swapped.status).toBe('idle')
+  })
 })

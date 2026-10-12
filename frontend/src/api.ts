@@ -118,6 +118,7 @@ export async function fetchRoute(
   destination: LngLat,
   algorithm: string,
   signal?: AbortSignal,
+  { trace = true }: { trace?: boolean } = {},
 ): Promise<RouteResponse> {
   const response = await fetch('/api/route', {
     method: 'POST',
@@ -126,7 +127,7 @@ export async function fetchRoute(
       origin: { lon: origin[0], lat: origin[1] },
       destination: { lon: destination[0], lat: destination[1] },
       algorithm,
-      trace: true,
+      trace,
     }),
     signal,
   })

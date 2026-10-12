@@ -136,4 +136,69 @@ describe('App', () => {
     expect(await screen.findByRole('radio', { name: 'DFS' })).toBeDisabled()
     expect(screen.getByRole('radio', { name: 'Dijkstra' })).toHaveAttribute('aria-checked', 'true')
   })
+
+  it('swaps the two points and searches again', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('A'))
+    fireEvent.click(screen.getByText('B'))
+    await act(async () => resolvers.at(-1)!(new Response(JSON.stringify(routeBody(2000)))))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Swap starting point and destination' }))
+
+    const routeCalls = vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/route')
+    const last = JSON.parse(routeCalls.at(-1)![1]!.body as string)
+    expect(last.origin).toEqual({ lon: -79.39, lat: 43.66 })
+    expect(last.destination).toEqual({ lon: -79.38, lat: 43.65 })
+  })
+
+  it('compares every implemented algorithm on request', async () => {
+    render(<App />)
+    await screen.findByRole('radio', { name: 'BFS' })
+    fireEvent.click(screen.getByText('A'))
+    fireEvent.click(screen.getByText('B'))
+    await act(async () => resolvers.at(-1)!(new Response(JSON.stringify(routeBody(2000)))))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compare algorithms' }))
+    // Answer the comparison's requests as they come, one at a time.
+    await act(async () => resolvers.at(-1)!(new Response(JSON.stringify(routeBody(2000)))))
+
+    const compared = vi
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => url === '/api/route')
+      .map(([, init]) => JSON.parse(init!.body as string))
+      .filter((body) => body.trace === false)
+      .map((body) => body.algorithm)
+    expect(compared).toEqual(['dijkstra', 'bfs'])
+    expect(screen.getByRole('region', { name: 'Algorithm comparison' })).toBeInTheDocument()
+  })
+
+  it('turns the comparison off when the points change', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('A'))
+    fireEvent.click(screen.getByText('B'))
+    await act(async () => resolvers.at(-1)!(new Response(JSON.stringify(routeBody(2000)))))
+    fireEvent.click(screen.getByRole('button', { name: 'Compare algorithms' }))
+    expect(screen.getByRole('region', { name: 'Algorithm comparison' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('C')) // starts over
+    fireEvent.click(screen.getByText('A')) // new destination
+    const routeCallsBefore = vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/route').length
+    await act(async () => resolvers.at(-1)!(new Response(JSON.stringify(routeBody(1500)))))
+
+    expect(screen.queryByRole('region', { name: 'Algorithm comparison' })).not.toBeInTheDocument()
+    const routeCallsAfter = vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/route').length
+    expect(routeCallsAfter).toBe(routeCallsBefore) // no surprise comparison requests
+  })
+
+  it('returns focus to the compare button when the table is closed', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByText('A'))
+    fireEvent.click(screen.getByText('B'))
+    await act(async () => resolvers.at(-1)!(new Response(JSON.stringify(routeBody(2000)))))
+    fireEvent.click(screen.getByRole('button', { name: 'Compare algorithms' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close comparison' }))
+
+    expect(screen.getByRole('button', { name: 'Compare algorithms' })).toHaveFocus()
+  })
 })

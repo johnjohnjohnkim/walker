@@ -252,3 +252,39 @@ def test_a_slightly_longer_route_is_not_called_the_shortest(client, graph_file, 
 
     assert metrics["is_shortest"] is False
     assert metrics["extra_distance_m"] == 0.5
+
+
+def test_measurements_never_overlap(client, graph_file, monkeypatch):
+    """Two requests timing searches at once would skew each other's numbers."""
+    import threading
+    import time
+
+    import algorithms
+    from algorithms import metrics
+
+    active = []
+    overlap = []
+    real_time_search = metrics.time_search
+
+    def watched(*args, **kwargs):
+        active.append(1)
+        if len(active) > 1:
+            overlap.append(True)
+        try:
+            time.sleep(0.05)  # long enough that unguarded runs would overlap
+            return real_time_search(*args, **kwargs)
+        finally:
+            active.pop()
+
+    monkeypatch.setattr("routing.views.time_search", watched)
+    for name in ("one", "two", "three"):
+        monkeypatch.setitem(algorithms.ALGORITHMS, name, dijkstra.search)
+
+    threads = [threading.Thread(target=post_route, args=(client, name)) for name in ("one", "two", "three")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert overlap == []
+    assert len(active) == 0

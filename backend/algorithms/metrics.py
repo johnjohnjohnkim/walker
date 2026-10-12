@@ -39,6 +39,11 @@ from .runner import DEFAULT_TIME_LIMIT_S, AlgorithmError, SearchFunction, max_ev
 TIMING_BUDGET_S = 0.3
 MAX_RUNS = 5
 
+# One measurement at a time in this process: searches timed side by side
+# (two browser tabs, or a comparison) would slow each other down and the
+# cached numbers would be wrong for good. Waiting is cheap next to that.
+measure_lock = threading.Lock()
+
 # Keeps two memory measurements from overlapping. tracemalloc counts
 # allocations from every thread, so the figure is only exact when no other
 # thread is busy at the same time: true for gunicorn's sync workers, not

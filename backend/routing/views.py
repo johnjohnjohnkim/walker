@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
 from algorithms import ALGORITHMS, REGISTRY, dijkstra
-from algorithms.metrics import peak_memory_bytes, time_search
+from algorithms.metrics import measure_lock, peak_memory_bytes, time_search
 from algorithms.runner import AlgorithmError, AlgorithmNotImplemented, run
 
 from geocoding import GeocoderUnavailable
@@ -313,8 +313,9 @@ def _measure(algorithm, search, graph, graph_key, start, goal, result):
     if cached is not None:
         return cached
 
-    timing = time_search(search, graph, start, goal, expected_events=result.events)
-    memory = peak_memory_bytes(search, graph, start, goal, expected_events=result.events)
+    with measure_lock:
+        timing = time_search(search, graph, start, goal, expected_events=result.events)
+        memory = peak_memory_bytes(search, graph, start, goal, expected_events=result.events)
 
     reference_key = f"shortest|{graph_key}|{start}|{goal}"
     if search is dijkstra.search:

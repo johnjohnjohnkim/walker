@@ -4,6 +4,10 @@ A walking-only map of Toronto for exploring graph search. Instead of switching
 between car, transit and walking, you switch between search algorithms and
 watch how each one explores the street network.
 
+![Dijkstra exploring downtown Toronto between Union Station and Kensington Market](docs/exploring.jpg)
+
+![The finished route with what the search cost](docs/route.jpg)
+
 - **Backend:** Python 3.12, Django, managed with [uv](https://docs.astral.sh/uv/).
 - **Frontend:** React + TypeScript (Vite) with [MapLibre GL JS](https://maplibre.org/).
 - **Map data:** © OpenStreetMap contributors. Tiles from [OpenFreeMap](https://openfreemap.org/), place search from [Photon](https://photon.komoot.io/).
@@ -67,27 +71,33 @@ Settings come from environment variables. See `backend/.env.example` and
 | `WALKER_GRAPH_PATH` | backend | Graph file to serve. Relative paths are relative to `backend/`. Defaults to `data/downtown.walkgraph`. |
 | `WALKER_GEOCODER` | backend | `photon`, or a dotted path to another geocoder class. |
 | `WALKER_PHOTON_URL` | backend | Photon server. Defaults to the public one. |
-| `WALKER_GEOCODE_RATE`, `WALKER_GEOCODE_RATE_WINDOW_S` | backend | Searches allowed per client per window (30 per 10 s). |
+| `WALKER_GEOCODE_RATE`, `WALKER_GEOCODE_RATE_WINDOW_S` | backend | Searches allowed per client per window (10 per 10 s). |
+| `WALKER_GEOCODER_MAX_PER_S`, `WALKER_GEOCODER_BURST` | backend | Cap on requests sent to the geocoding provider, for the whole server (1 per second, bursts of 3). |
 | `VITE_MAP_STYLE_URL` | frontend | Map style JSON; swap to change tile provider. |
 | `VITE_API_PROXY_TARGET` | frontend | Where the dev server sends `/api`. |
 
 ## Using it
 
-Type a place into the starting point and destination boxes and pick a
-suggestion, or click the map: the first click sets the start, the second the
-destination, and a third starts over. The search then plays out on the
-map: every street segment it reaches is drawn as it happens, light at first
-and darker later, with the two halves of a bidirectional search in purple and
-orange. Pause, scrub, change speed or skip with the bar at the bottom. When
-it finishes, the walking route appears in blue with its time and distance,
-and a card under the directions shows what the search cost (time, memory,
-intersections explored, peak frontier size and how the route compares with
-the shortest one)
-(scrub back and it hides again until the search reaches the end). Explored
-streets are drawn as straight lines between intersections to keep the
-animation light; the route follows the real street shapes. If your system is
-set to reduce motion, searches open already finished and you can press play. Pick an algorithm from the chips to re-run the route
-with it.
+1. **Pick two points.** Type a place into the starting point and destination
+   boxes and choose a suggestion, or click the map: the first click sets the
+   start, the second the destination, and a third starts over. ⇅ swaps them.
+   If a point isn't on a street, a dotted line joins it to where the route
+   really starts.
+2. **Watch the search.** Every street segment the algorithm reaches is drawn
+   as it happens, light at first and darker later (the two halves of a
+   bidirectional search in purple and orange). Pause, scrub, change speed or
+   skip with the bar at the bottom. Explored streets are drawn as straight
+   lines between intersections to keep the animation light. If your system
+   is set to reduce motion, searches open already finished.
+3. **Read the result.** When the search reaches the end, the walking route
+   appears in blue with its time and distance, and the card under the
+   directions shows what the search cost: time, memory, intersections
+   explored, peak frontier size and how the route compares with the shortest.
+4. **Compare.** Pick another algorithm from the chips to re-run the route
+   with it, or press *Compare algorithms* to run them all: a table lists each
+   one's route length, intersections explored and time, and the others'
+   routes appear in grey on the map. The algorithms run one after another so
+   their timings don't disturb each other.
 
 ## API
 
@@ -110,6 +120,7 @@ nodes the search visited. Errors are JSON with `error` and `code`:
 | 501 | `not_implemented` | The algorithm is still a stub |
 | 422 | `outside_coverage` | A point is more than 300 m from any street on the map |
 | 422 | `no_route` | The points aren't connected |
+| 500 | `algorithm_error` | The algorithm crashed, broke the event rules, looped, or gave a different result when run again (details shown in debug mode) |
 | 503 | `graph_unavailable` | No graph is loaded |
 
 Every route also carries `metrics`, what the search cost:
@@ -137,8 +148,9 @@ numbers. Timing repeated requests for the same downtown route varies by about
 shortest distance), so the results are cached per algorithm and route: the
 first request for the longest downtown route (with its animation trace)
 takes about 0.2 s, repeats
-about 0.05 s. Memory figures are exact when the server handles one request at
-a time (gunicorn sync workers); other busy threads would add to them.
+about 0.05 s. Measurements run one at a time per server process, so two
+requests never time each other; memory figures are exact when no other
+request is busy at the same moment (true for gunicorn sync workers).
 
 Add `"trace": true` to get every step of the search for the animation, as
 `trace: {coordinates, events, count, truncated}`. `coordinates` lists each
@@ -151,15 +163,43 @@ Traces over 200,000 steps are cut short and marked `truncated`.
 
 `GET /api/geocode?q=CN%20Tower` suggests places on the map (up to 8, default
 5) as `{name, address, lon, lat}`. It forwards to the configured geocoder
-(Photon by default), caches answers for a day, and allows each client 30
-searches per 10 seconds (429 `rate_limited` beyond that; 503
-`geocoder_unavailable` if the provider is down).
+(Photon by default), caches answers for a day, allows each client 10
+searches per 10 seconds and sends the provider at most about one request a
+second (429 `rate_limited` beyond either; 503 `geocoder_unavailable` if the
+provider is down, after which it isn't asked again for 30 seconds).
 
 `GET /api/algorithms` lists the search algorithms and which are implemented.
 
 `GET /api/health` reports whether a graph is loaded and its size.
 
 ## Search algorithms
+
+What each algorithm does, and what to look for when it runs:
+
+- **Dijkstra** keeps every reached intersection in a priority queue ordered
+  by walking distance from the start and always explores the closest one
+  next. It spreads out in rings by distance and always finds the shortest
+  route, but explores everything closer than the goal in every direction.
+- **A\*** is Dijkstra with a sense of direction: an intersection's priority
+  is its distance so far plus the straight-line distance still to go. As long
+  as that estimate never overshoots, the route is still the shortest, but the
+  search narrows into a beam toward the goal and explores far less.
+- **Bidirectional Dijkstra** runs one search from each end and stops once
+  they have met and no shorter route can still exist. Two small circles cover
+  much less than one big one. The tricky part is knowing when to stop: the
+  first intersection both searches reach isn't always on the shortest route.
+- **BFS** (breadth-first search) explores in rings of street *segments*,
+  ignoring their length. It finds the route with the fewest segments, which
+  on real streets is often longer to walk than Dijkstra's.
+- **DFS** (depth-first search) follows one street as far as it can before
+  backing up. It finds *a* route, usually a long and winding one, which is
+  exactly what it shows.
+
+On a graph with V intersections and E street segments, Dijkstra, A\* and
+bidirectional Dijkstra take O((V + E) log V) time with a binary heap; BFS and
+DFS take O(V + E).
+
+### Status
 
 | Algorithm | File | Returns | Status |
 | --- | --- | --- | --- |

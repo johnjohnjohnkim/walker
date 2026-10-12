@@ -11,6 +11,11 @@ interface Props {
   origin: LngLat | null
   destination: LngLat | null
   route: LngLat[] | null
+  // Other algorithms' routes for the same points, drawn in grey.
+  alternatives: LngLat[][]
+  // Dashed lines from where each point was asked for to where the route
+  // actually starts or ends (the nearest walkable street).
+  snapLines: [LngLat, LngLat][]
   // The search's exploration, revealed up to `traceStep` events.
   trace: DecodedTrace | null
   traceStep: number
@@ -24,6 +29,8 @@ interface Props {
 }
 
 const ROUTE_SOURCE = 'route'
+const ALTERNATIVES_SOURCE = 'alternatives'
+const SNAP_SOURCE = 'snap-lines'
 const EDGES_SOURCE = 'explored-edges'
 const VISITS_SOURCE = 'explored-visits'
 const EDGES_LAYER = 'explored-edges'
@@ -48,6 +55,8 @@ export function MapView({
   origin,
   destination,
   route,
+  alternatives,
+  snapLines,
   trace,
   traceStep,
   routeVisible,
@@ -105,6 +114,38 @@ export function MapView({
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 1, 16, 3],
             'circle-opacity': whenShown(0.8),
           },
+        },
+        firstSymbol,
+      )
+      map.addSource(ALTERNATIVES_SOURCE, { type: 'geojson', data: emptyLine() })
+      map.addLayer(
+        {
+          id: 'alternatives-casing',
+          type: 'line',
+          source: ALTERNATIVES_SOURCE,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#80868b', 'line-width': 8 },
+        },
+        firstSymbol,
+      )
+      map.addLayer(
+        {
+          id: 'alternatives-line',
+          type: 'line',
+          source: ALTERNATIVES_SOURCE,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#bbbdbf', 'line-width': 5 },
+        },
+        firstSymbol,
+      )
+      map.addSource(SNAP_SOURCE, { type: 'geojson', data: emptyLine() })
+      map.addLayer(
+        {
+          id: 'snap-lines',
+          type: 'line',
+          source: SNAP_SOURCE,
+          layout: { 'line-cap': 'round' },
+          paint: { 'line-color': '#5f6368', 'line-width': 2, 'line-dasharray': [0.5, 2] },
         },
         firstSymbol,
       )
@@ -213,6 +254,18 @@ export function MapView({
     shownRef.current = target
   }, [trace, traceStep, styleLoaded])
 
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !styleLoaded) return
+    map.getSource<maplibregl.GeoJSONSource>(ALTERNATIVES_SOURCE)?.setData(lines(alternatives))
+  }, [alternatives, styleLoaded])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !styleLoaded) return
+    map.getSource<maplibregl.GeoJSONSource>(SNAP_SOURCE)?.setData(lines(snapLines))
+  }, [snapLines, styleLoaded])
+
   // The route line appears once the exploration has played out.
   useEffect(() => {
     const map = mapRef.current
@@ -258,6 +311,10 @@ function fitPadding(map: maplibregl.Map) {
 
 function line(coordinates: LngLat[]): Feature<LineString> {
   return { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }
+}
+
+function lines(lineList: LngLat[][]): FeatureCollection {
+  return { type: 'FeatureCollection', features: lineList.filter((l) => l.length > 1).map(line) }
 }
 
 function emptyLine(): FeatureCollection {

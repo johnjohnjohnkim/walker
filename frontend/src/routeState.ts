@@ -26,6 +26,7 @@ export type RouteAction =
   | { type: 'mapClicked'; point: LngLat }
   | { type: 'pointChosen'; which: Endpoint; point: LngLat; label: string }
   | { type: 'cleared' }
+  | { type: 'swapped' }
   | { type: 'algorithmChanged'; algorithm: string }
   | { type: 'routeLoaded'; requestId: number; route: RouteResponse }
   | { type: 'routeFailed'; requestId: number; error: string }
@@ -74,6 +75,14 @@ export function routeReducer(state: RouteState, action: RouteAction): RouteState
       return action.which === 'origin'
         ? withPoints(state, { origin: action.point, originLabel: action.label })
         : withPoints(state, { destination: action.point, destinationLabel: action.label })
+    case 'swapped':
+      if (state.origin === null && state.destination === null) return state
+      return withPoints(state, {
+        origin: state.destination,
+        destination: state.origin,
+        originLabel: state.destinationLabel,
+        destinationLabel: state.originLabel,
+      })
     case 'cleared':
       return { ...initialRouteState, algorithm: state.algorithm, requestId: state.requestId + 1 }
     case 'algorithmChanged':
