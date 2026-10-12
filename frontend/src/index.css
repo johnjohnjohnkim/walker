@@ -3,6 +3,7 @@
   --text: #202124;
   --text-muted: #5f6368;
   --ok: #188038;
+  --accent: #1a73e8;
   --down: #d93025;
   --shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
 
@@ -55,4 +56,82 @@ body {
 
 .health-badge--down {
   color: var(--down);
+}
+
+.panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 360px;
+  max-width: calc(100% - 32px);
+  padding: 16px 20px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.panel__title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.panel__hint,
+.panel__meta {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.panel__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+}
+
+.panel__duration {
+  font-size: 22px;
+  color: var(--ok);
+}
+
+.panel__distance {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.panel__meta {
+  flex-basis: 100%;
+  margin-top: 4px;
+}
+
+.panel__error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--down);
+}
+
+.panel__clear {
+  margin-top: 12px;
+  padding: 6px 16px;
+  border: 1px solid #dadce0;
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.panel__clear:hover {
+  background: #f1f3f4;
+}
+
+.origin-marker {
+  width: 16px;
+  height: 16px;
+  border: 3px solid #202124;
+  border-radius: 50%;
+  background: var(--surface);
+  cursor: pointer;
 }

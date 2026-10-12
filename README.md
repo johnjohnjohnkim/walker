@@ -68,6 +68,45 @@ Settings come from environment variables. See `backend/.env.example` and
 | `VITE_MAP_STYLE_URL` | frontend | Map style JSON; swap to change tile provider. |
 | `VITE_API_PROXY_TARGET` | frontend | Where the dev server sends `/api`. |
 
+## Using it
+
+Click the map once to set a starting point and again to set a destination.
+The walking route appears in blue with its time and distance. A third click
+starts over.
+
+## API
+
+`POST /api/route`
+
+```json
+{"origin": {"lon": -79.3871, "lat": 43.6426},
+ "destination": {"lon": -79.4005, "lat": 43.6547},
+ "algorithm": "dijkstra"}
+```
+
+Each point snaps to the nearest walkable node within 300 m. The response holds
+the route line (`route.coordinates`, as `[lon, lat]` pairs), its length and an
+estimated walking time at 1.4 m/s, where each point snapped to, and how many
+nodes the search visited. Errors are JSON with `error` and `code`:
+
+| Status | `code` | Meaning |
+| --- | --- | --- |
+| 400 | `bad_request`, `unknown_algorithm` | Malformed body or unknown algorithm |
+| 422 | `outside_coverage` | A point is more than 300 m from any street on the map |
+| 422 | `no_route` | The points aren't connected |
+| 503 | `graph_unavailable` | No graph is loaded |
+
+`GET /api/health` reports whether a graph is loaded and its size.
+
+## Search algorithms
+
+Each algorithm lives in `backend/algorithms/` as a generator function that
+yields events while it runs: `Discover` when a node joins the frontier,
+`Visit` when it is explored, and a final `Done` with the path. The contract,
+with a worked example, is in `backend/algorithms/events.py`. The runner checks
+every result: the path must start and end at the right nodes and use real
+edges, and its length is measured from the graph rather than trusted.
+
 ## The graph
 
 | Area | Nodes | Edges | File | Build | Load + index | Memory |
@@ -89,6 +128,7 @@ See `backend/graph/graph.py`.
 ```
 backend/
   config/     Django settings and URLs
+  algorithms/ search algorithms and the runner that checks them
   graph/      the walkable graph: build from OSM, storage, nearest-node lookup
               (no Django imports)
   routing/    API views and the in-memory graph store
