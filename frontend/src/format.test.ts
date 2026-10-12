@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDistance, formatDuration } from './format'
+import { formatBytes, formatDistance, formatDuration, formatMs } from './format'
 
 describe('formatDistance', () => {
   it.each([
@@ -22,5 +22,25 @@ describe('formatDuration', () => {
     [3900, '1 hr 5 min'],
   ])('%d s -> %s', (seconds, expected) => {
     expect(formatDuration(seconds)).toBe(expected)
+  })
+})
+
+describe('formatMs', () => {
+  it.each([
+    [0.0421, '0.042 ms'],
+    [3.84, '3.8 ms'],
+    [142.4, '142 ms'],
+  ])('%d -> %s', (ms, expected) => {
+    expect(formatMs(ms)).toBe(expected)
+  })
+})
+
+describe('formatBytes', () => {
+  it.each([
+    [512, '512 B'],
+    [2662, '2.7 KB'],
+    [2673380, '2.7 MB'],
+  ])('%d -> %s', (bytes, expected) => {
+    expect(formatBytes(bytes)).toBe(expected)
   })
 })

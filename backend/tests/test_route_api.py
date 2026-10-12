@@ -31,7 +31,7 @@ def test_finds_a_route_across_the_grid(client, graph_file):
     assert coords[0] == body["origin"]["snapped"]
     assert coords[-1] == body["destination"]["snapped"]
     assert 0 < body["origin"]["snap_distance_m"] < 10
-    assert body["search"]["visited"] >= 5
+    assert body["metrics"]["visited"] >= 5
 
 
 def test_algorithm_defaults_to_dijkstra(client, graph_file):
@@ -201,7 +201,7 @@ def test_trace_lists_every_event_compactly(client, graph_file):
     assert events[:6] == [0, 0, -1, 1, 0, -1]
     assert trace["coordinates"][0] == body["origin"]["snapped"]
     # Visits match the reported count.
-    assert events[0::3].count(1) == body["search"]["visited"]
+    assert events[0::3].count(1) == body["metrics"]["visited"]
 
 
 def test_trace_is_cut_short_past_the_limit(client, graph_file, monkeypatch):

@@ -58,12 +58,23 @@ body {
   color: var(--down);
 }
 
-.panel {
+/* The left column: directions panel with the metrics card beneath. */
+.sidebar {
   position: absolute;
   top: 16px;
   left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   width: 360px;
   max-width: calc(100% - 32px);
+  /* Leave room for the playback bar at the bottom. */
+  max-height: calc(100% - 130px);
+  overflow-y: auto;
+}
+
+.panel {
+  flex: none;
   padding: 16px 20px;
   border-radius: 8px;
   background: var(--surface);
@@ -373,4 +384,82 @@ body {
   .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group {
     display: none;
   }
+}
+
+.metrics {
+  flex: none;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+
+.metrics__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.metrics__header:hover {
+  background: #f8f9fa;
+}
+
+.metrics__list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0 20px 4px;
+}
+
+.metrics__row dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.metrics__row dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.metrics__note {
+  margin: 8px 20px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.metrics__list--explained {
+  grid-template-columns: 1fr;
+}
+
+.metrics__help {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.metrics__explain {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.metrics__explain:hover {
+  text-decoration: underline;
 }

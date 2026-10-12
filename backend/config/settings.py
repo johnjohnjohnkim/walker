@@ -93,6 +93,13 @@ CACHES = {
         "LOCATION": "geocode",
         "OPTIONS": {"MAX_ENTRIES": 10_000},
     },
+    # Search measurements, keyed by graph, algorithm and endpoints, so asking
+    # for the same route again doesn't redo the timing runs.
+    "metrics": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "metrics",
+        "OPTIONS": {"MAX_ENTRIES": 5_000},
+    },
     "ratelimit": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "ratelimit",

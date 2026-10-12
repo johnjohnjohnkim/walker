@@ -32,11 +32,26 @@ export interface RouteResponse {
   }
   origin: RouteEndpoint
   destination: RouteEndpoint
-  search: {
-    visited: number
-    discovered: number
-  }
+  metrics: SearchMetrics
   trace: TracePayload | null
+}
+
+/** What the search cost to run (see backend/algorithms/metrics.py). */
+export interface SearchMetrics {
+  // Median time of the algorithm alone over `timing_runs` clean runs.
+  wall_ms: number
+  cpu_ms: number
+  timing_runs: number
+  peak_memory_bytes: number
+  visited: number
+  discovered: number
+  frontier_pushes: number
+  peak_frontier: number
+  path_nodes: number
+  optimal_distance_m: number
+  is_shortest: boolean
+  extra_distance_m: number
+  extra_distance_pct: number
 }
 
 /**

@@ -1,4 +1,5 @@
 import pytest
+from django.core.cache import caches
 
 from graph import WalkGraph
 from routing import graph_store
@@ -48,8 +49,10 @@ def graph_file(tmp_path, settings, grid_graph):
     grid_graph.save(path)
     settings.WALKER_GRAPH_PATH = path
     graph_store.reset()
+    caches["metrics"].clear()
     yield path
     graph_store.reset()
+    caches["metrics"].clear()
 
 
 @pytest.fixture

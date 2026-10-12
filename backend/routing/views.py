@@ -1,12 +1,15 @@
+import hashlib
 import json
 import logging
 import math
 
 from django.conf import settings
+from django.core.cache import caches
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
-from algorithms import ALGORITHMS, REGISTRY
+from algorithms import ALGORITHMS, REGISTRY, dijkstra
+from algorithms.metrics import peak_memory_bytes, time_search
 from algorithms.runner import AlgorithmError, AlgorithmNotImplemented, run
 
 from geocoding import GeocoderUnavailable
@@ -238,6 +241,21 @@ def route(request):
     if result.path is None:
         return error("No walking route connects these points.", "no_route", 422)
 
+    # The checked run above proved the algorithm behaves; now measure it,
+    # or reuse the measurements from the last time this route was asked for.
+    graph_key = f"{loaded.path}|{graph.meta.get('built_at')}"
+    try:
+        measured = _measure(algorithm, search, graph, graph_key, start, goal, result)
+    except AlgorithmError as exc:
+        logger.warning("Algorithm %s failed while being measured: %s", algorithm, exc)
+        message = f"The {algorithm} implementation failed while being measured"
+        return error(f"{message}: {exc}" if settings.DEBUG else f"{message}.", "algorithm_error", 500)
+    timing, memory, optimal_m = measured
+    extra_m = result.distance_m - optimal_m
+    # Compare with a tiny tolerance for float noise, not by rounding: a route
+    # 1 m longer than the best must not be called the shortest.
+    is_shortest = extra_m <= 1e-6 * max(optimal_m, 1.0)
+
     return JsonResponse(
         {
             "algorithm": algorithm,
@@ -257,13 +275,60 @@ def route(request):
                 "snapped": _rounded([graph.coord(goal)])[0],
                 "snap_distance_m": round(goal_offset, 1),
             },
-            "search": {
+            "metrics": {
+                # Time and memory of the algorithm alone, not the request.
+                "wall_ms": round(timing.wall_ms, 3),
+                "cpu_ms": round(timing.cpu_ms, 3),
+                "timing_runs": timing.runs,
+                "peak_memory_bytes": memory,
                 "visited": result.visited,
                 "discovered": result.discovered,
+                "frontier_pushes": result.frontier_pushes,
+                "peak_frontier": result.peak_frontier,
+                "path_nodes": len(result.path),
+                "optimal_distance_m": round(optimal_m, 1),
+                "is_shortest": is_shortest,
+                "extra_distance_m": 0.0 if is_shortest else round(extra_m, 1),
+                "extra_distance_pct": 0.0 if is_shortest or not optimal_m else round(100 * extra_m / optimal_m, 2),
             },
             "trace": _trace_payload(graph, result.trace) if result.trace is not None else None,
         }
     )
+
+
+def _measure(algorithm, search, graph, graph_key, start, goal, result):
+    """(timing, peak memory, shortest distance) for this search, cached.
+
+    Measuring runs the search several more times (up to five timed runs and
+    one under tracemalloc, plus a Dijkstra run for the shortest distance), so
+    repeat requests for the same route reuse the answer.
+    """
+    cache = caches["metrics"]
+    # Include the algorithm's compiled code, so editing it never shows the
+    # old version's numbers (on servers that don't restart on save).
+    code = getattr(search, "__code__", None)
+    version = hashlib.sha256(code.co_code + repr(code.co_consts).encode()).hexdigest()[:16] if code else "?"
+    key = f"metrics|{graph_key}|{algorithm}|{version}|{start}|{goal}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    timing = time_search(search, graph, start, goal, expected_events=result.events)
+    memory = peak_memory_bytes(search, graph, start, goal, expected_events=result.events)
+
+    reference_key = f"shortest|{graph_key}|{start}|{goal}"
+    if search is dijkstra.search:
+        optimal_m = result.distance_m
+        cache.set(reference_key, optimal_m)
+    else:
+        optimal_m = cache.get(reference_key)
+        if optimal_m is None:
+            optimal_m = run(dijkstra.search, graph, start, goal).distance_m
+            cache.set(reference_key, optimal_m)
+
+    measured = (timing, memory, optimal_m)
+    cache.set(key, measured)
+    return measured
 
 
 def not_found(request, exception):

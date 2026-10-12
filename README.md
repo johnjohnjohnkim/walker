@@ -79,7 +79,10 @@ destination, and a third starts over. The search then plays out on the
 map: every street segment it reaches is drawn as it happens, light at first
 and darker later, with the two halves of a bidirectional search in purple and
 orange. Pause, scrub, change speed or skip with the bar at the bottom. When
-it finishes, the walking route appears in blue with its time and distance
+it finishes, the walking route appears in blue with its time and distance,
+and a card under the directions shows what the search cost (time, memory,
+intersections explored, peak frontier size and how the route compares with
+the shortest one)
 (scrub back and it hides again until the search reaches the end). Explored
 streets are drawn as straight lines between intersections to keep the
 animation light; the route follows the real street shapes. If your system is
@@ -108,6 +111,34 @@ nodes the search visited. Errors are JSON with `error` and `code`:
 | 422 | `outside_coverage` | A point is more than 300 m from any street on the map |
 | 422 | `no_route` | The points aren't connected |
 | 503 | `graph_unavailable` | No graph is loaded |
+
+Every route also carries `metrics`, what the search cost:
+
+| Field | Meaning |
+| --- | --- |
+| `wall_ms`, `cpu_ms` | Median time of the algorithm alone over `timing_runs` clean runs (up to 5, within about 0.3 s) |
+| `peak_memory_bytes` | Most memory the algorithm's own allocations reached, from a separate run under `tracemalloc` |
+| `visited` | Intersections taken off the frontier and expanded |
+| `discovered` | Different intersections ever added to the frontier |
+| `frontier_pushes` | Additions to the frontier, including improved routes to a node already there |
+| `peak_frontier` | Most *different* intersections waiting on the frontier at once (both halves together for bidirectional). A heap or stack that keeps outdated duplicate entries holds more than this. |
+| `path_nodes` | Intersections on the route |
+| `optimal_distance_m`, `is_shortest`, `extra_distance_m`, `extra_distance_pct` | How the route compares with Dijkstra's shortest one. `is_shortest` uses a tiny tolerance for rounding, never percentage rounding, so a route 1 m too long is not called the shortest. |
+
+Each measurement comes from its own pass, because measuring changes what is
+measured: a checked run validates the algorithm and records the animation,
+clean runs (nothing but the algorithm) give the timing, and a final run under
+`tracemalloc`, which slows Python several times over, gives the memory.
+Every repeat run must yield exactly as many events as the checked one, under
+the same event cap and time limit; an algorithm that keeps state between runs
+or uses randomness is reported as an error rather than given meaningless
+numbers. Timing repeated requests for the same downtown route varies by about
+1%. Measuring runs the search up to eight times (plus a Dijkstra run for the
+shortest distance), so the results are cached per algorithm and route: the
+first request for the longest downtown route (with its animation trace)
+takes about 0.2 s, repeats
+about 0.05 s. Memory figures are exact when the server handles one request at
+a time (gunicorn sync workers); other busy threads would add to them.
 
 Add `"trace": true` to get every step of the search for the animation, as
 `trace: {coordinates, events, count, truncated}`. `coordinates` lists each

@@ -28,7 +28,22 @@ function routeBody(distance: number) {
     route: { coordinates: [[-79.38, 43.65], [-79.39, 43.66]], distance_m: distance, duration_s: distance / 1.4, nodes: 2 },
     origin: { requested: [0, 0], snapped: [0, 0], snap_distance_m: 1 },
     destination: { requested: [0, 0], snapped: [0, 0], snap_distance_m: 1 },
-    search: { visited: 10, discovered: 12 },
+    metrics: {
+      wall_ms: 1.5,
+      cpu_ms: 1.4,
+      timing_runs: 5,
+      peak_memory_bytes: 2048,
+      visited: 10,
+      discovered: 12,
+      frontier_pushes: 13,
+      peak_frontier: 4,
+      path_nodes: 2,
+      optimal_distance_m: distance,
+      is_shortest: true,
+      extra_distance_m: 0,
+      extra_distance_pct: 0,
+    },
+    trace: null,
   }
 }
 

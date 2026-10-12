@@ -81,6 +81,14 @@ class SearchResult:
     # Distinct nodes ever placed on the frontier (per side), however many
     # times each was rediscovered.
     discovered: int
+    # Discover events, counting rediscoveries by a better route: how many
+    # times something was pushed onto the frontier.
+    frontier_pushes: int = 0
+    # The most nodes waiting on the frontier at once (discovered but not yet
+    # visited, both sides together): the usual measure of a search's memory.
+    peak_frontier: int = 0
+    # Every event yielded, including Done. Repeat runs must match it.
+    events: int = 0
     # Only when run with record=True.
     trace: Trace | None = None
 
@@ -147,7 +155,14 @@ def run(
     events = count - 1  # every counted event except Done
     trace = Trace(codes, nodes, parents, total=events) if codes is not None else None
     return SearchResult(
-        path=path, distance_m=distance, visited=checker.visited, discovered=checker.discovered, trace=trace
+        path=path,
+        distance_m=distance,
+        visited=checker.visited,
+        discovered=checker.discovered,
+        frontier_pushes=checker.pushes,
+        peak_frontier=checker.peak_frontier,
+        events=count,
+        trace=trace,
     )
 
 
@@ -159,6 +174,8 @@ class _TraceChecker:
         self.roots = {"forward": start, "backward": goal}
         self.seen = {side: set() for side in SIDES}
         self.explored = {side: set() for side in SIDES}
+        self.pushes = 0
+        self.peak_frontier = 0
 
     @property
     def visited(self) -> int:
@@ -171,6 +188,12 @@ class _TraceChecker:
     def check(self, event: Event) -> None:
         if isinstance(event, Discover):
             self._discover(event)
+            self.pushes += 1
+            # Every visited node was discovered first, so the nodes still
+            # waiting are the discovered ones minus the visited ones.
+            waiting = self.discovered - self.visited
+            if waiting > self.peak_frontier:
+                self.peak_frontier = waiting
         elif isinstance(event, Visit):
             self._visit(event)
         else:

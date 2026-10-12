@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { type AlgorithmInfo, ApiError, fetchAlgorithms, fetchRoute, type LngLat, type Place } from './api'
 import { HealthBadge } from './components/HealthBadge'
+import { MetricsCard } from './components/MetricsCard'
 import { MapView } from './components/MapView'
 import { PlaybackBar } from './components/PlaybackBar'
 import { RoutePanel } from './components/RoutePanel'
@@ -82,13 +83,22 @@ export default function App() {
         showBothPoints={status === 'error'}
         onMapClick={handleMapClick}
       />
-      <RoutePanel
-        state={state}
-        algorithms={algorithms}
-        onAlgorithmChange={handleAlgorithmChange}
-        onPlaceSelect={handlePlaceSelect}
-        onClear={handleClear}
-      />
+      <div className="sidebar">
+        <RoutePanel
+          state={state}
+          algorithms={algorithms}
+          onAlgorithmChange={handleAlgorithmChange}
+          onPlaceSelect={handlePlaceSelect}
+          onClear={handleClear}
+        />
+        {state.status === 'done' && state.route && (
+          <MetricsCard
+            metrics={state.route.metrics}
+            algorithmName={algorithmName}
+            distanceM={state.route.route.distance_m}
+          />
+        )}
+      </div>
       {trace && <PlaybackBar trace={trace} playback={playback} algorithmName={algorithmName} />}
       <HealthBadge />
     </div>

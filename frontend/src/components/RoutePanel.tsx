@@ -62,7 +62,7 @@ export const RoutePanel = memo(function RoutePanel({
           <span className="panel__duration">{formatDuration(route.route.duration_s)}</span>
           <span className="panel__distance">{formatDistance(route.route.distance_m)}</span>
           <p className="panel__meta">
-            {algorithms.find((a) => a.id === route.algorithm)?.name ?? route.algorithm} explored {route.search.visited.toLocaleString('en-US')} intersections
+            {algorithms.find((a) => a.id === route.algorithm)?.name ?? route.algorithm} explored {route.metrics.visited.toLocaleString('en-US')} intersections
           </p>
         </div>
       )}
