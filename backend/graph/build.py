@@ -2,7 +2,8 @@
 
 Run once per area, from the backend directory:
 
-    uv run python -m graph.build --area downtown
+    uv run python -m graph.build --area toronto     # whole city, about 2 minutes
+    uv run python -m graph.build --area downtown    # small, for quick work and tests
 
 This is the only code that touches the network or OSMnx. The server just
 loads the file it writes.
@@ -100,15 +101,23 @@ def build(area: Area, out: Path) -> WalkGraph:
 
 
 def measure_load(path: Path) -> None:
-    """Print how long the server will take to load the file and how much memory it uses."""
+    """Print how long the server will take to load the file and how much memory it uses.
+
+    Timed and memory-measured in separate loads: tracemalloc slows Python down
+    several times, so timing a traced load would overstate it.
+    """
     from .spatial import NodeIndex
 
-    tracemalloc.start()
     started = time.perf_counter()
     graph = WalkGraph.load(path)
     loaded = time.perf_counter()
-    index = NodeIndex(graph)
+    NodeIndex(graph)
     indexed = time.perf_counter()
+    del graph
+
+    tracemalloc.start()
+    graph = WalkGraph.load(path)
+    index = NodeIndex(graph)
     current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     del graph, index
@@ -118,7 +127,7 @@ def measure_load(path: Path) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--area", choices=sorted(AREAS), default="downtown")
+    parser.add_argument("--area", choices=sorted(AREAS), default="toronto")
     parser.add_argument("--out", type=Path, help="output file (default: data/<area>.walkgraph)")
     args = parser.parse_args(argv)
 

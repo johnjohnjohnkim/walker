@@ -88,4 +88,10 @@ describe('MetricsCard', () => {
 
     expect(screen.getByText(/server was busy/)).toBeInTheDocument()
   })
+
+  it('says when memory was not measured', () => {
+    render(<MetricsCard metrics={{ ...METRICS, peak_memory_bytes: null }} algorithmName="Dijkstra" distanceM={6340} />)
+
+    expect(value('Peak memory')).toBe('not measured')
+  })
 })

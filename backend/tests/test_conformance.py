@@ -202,7 +202,7 @@ def test_random_graphs(algorithm, seed):
 DOWNTOWN = default_path("downtown")
 
 
-@pytest.mark.skipif(not DOWNTOWN.exists(), reason="run `uv run python -m graph.build` first")
+@pytest.mark.skipif(not DOWNTOWN.exists(), reason="run `uv run python -m graph.build --area downtown` first")
 @pytest.mark.parametrize("algorithm", ALGORITHMS)
 def test_real_downtown_routes(algorithm, downtown_reference):
     graph, ref = downtown_reference

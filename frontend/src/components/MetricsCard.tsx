@@ -25,7 +25,9 @@ export const MetricsCard = memo(function MetricsCard({ metrics, algorithmName, d
         ? 'Processor time. Much lower than the wall-clock time, so the server was busy with other work.'
         : 'Processor time spent by the search (same runs).',
     ],
-    ['Peak memory', formatBytes(metrics.peak_memory_bytes), 'Most memory the search allocated at once.'],
+    metrics.peak_memory_bytes === null
+      ? ['Peak memory', 'not measured', 'This search is too large to measure memory quickly (it slows Python down several times).']
+      : ['Peak memory', formatBytes(metrics.peak_memory_bytes), 'Most memory the search allocated at once.'],
     ['Explored', formatCount(metrics.visited), 'Intersections taken off the frontier and expanded.'],
     ['Reached', formatCount(metrics.discovered), 'Different intersections ever added to the frontier.'],
     [

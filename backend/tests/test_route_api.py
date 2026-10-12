@@ -204,16 +204,75 @@ def test_trace_lists_every_event_compactly(client, graph_file):
     assert events[0::3].count(1) == body["metrics"]["visited"]
 
 
-def test_trace_is_cut_short_past_the_limit(client, graph_file, monkeypatch):
+def test_long_traces_are_sampled_evenly(client, graph_file, monkeypatch):
     from routing import views
 
+    full = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True}).json()["trace"]
     monkeypatch.setattr(views, "MAX_TRACE_EVENTS", 4)
+
+    sampled = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True}).json()["trace"]
+
+    stride = -(-full["count"] // 4)
+    assert sampled["stride"] == stride
+    assert sampled["count"] <= 5  # at most the limit, plus the last event
+    assert sampled["total"] == full["total"] == full["count"]
+    assert sampled["truncated"] is False
+    # Every k-th event, starting with the first, so the whole search is covered.
+    assert sampled["events"][:3] == full["events"][:3]
+    full_codes = full["events"][0::3]
+    expected = full_codes[::stride]
+    if (full["count"] - 1) % stride:
+        expected.append(full_codes[-1])
+    assert sampled["events"][0::3] == expected
+
+
+def test_sampled_traces_always_end_on_the_last_event(client, graph_file, monkeypatch):
+    from routing import views
+
+    full = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True}).json()["trace"]
+    # Pick a limit whose stride doesn't land on the last event by itself.
+    limit = next(n for n in range(2, full["count"]) if (full["count"] - 1) % -(-full["count"] // n) != 0)
+    monkeypatch.setattr(views, "MAX_TRACE_EVENTS", limit)
+
+    sampled = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True}).json()["trace"]
+
+    assert sampled["events"][-3:][0] == full["events"][-3:][0]
+    last_node = sampled["coordinates"][sampled["events"][-2]]
+    assert last_node == full["coordinates"][full["events"][-2]]
+
+
+def test_route_requests_are_rate_limited(client, graph_file, settings):
+    settings.WALKER_ROUTE_RATE = 2
+
+    statuses = [post(client, {"origin": point(0, 0), "destination": point(1, 0)}).status_code for _ in range(3)]
+
+    assert statuses == [200, 200, 429]
+    other = client.post(
+        "/api/route",
+        data=json.dumps({"origin": point(0, 0), "destination": point(1, 0)}),
+        content_type="application/json",
+        REMOTE_ADDR="10.0.0.9",
+    )
+    assert other.status_code == 200
+
+
+def test_unsampled_traces_say_so(client, graph_file):
+    trace = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True}).json()["trace"]
+
+    assert trace["stride"] == 1
+    assert trace["total"] == trace["count"]
+
+
+def test_recording_stops_at_the_memory_guard(client, graph_file, monkeypatch):
+    from routing import views
+
+    monkeypatch.setattr(views, "MAX_RECORDED_EVENTS", 4)
 
     trace = post(client, {"origin": point(0, 0), "destination": point(2, 2), "trace": True}).json()["trace"]
 
-    assert trace["count"] == 4
-    assert len(trace["events"]) == 12
     assert trace["truncated"] is True
+    assert trace["count"] == 4
+    assert trace["total"] > 4
 
 
 def test_trace_flag_must_be_boolean(client, graph_file):

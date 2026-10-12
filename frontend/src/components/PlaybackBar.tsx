@@ -6,12 +6,24 @@ interface Props {
   trace: DecodedTrace
   playback: Playback
   algorithmName: string
+  // The search's real number of visits (the trace may be a sample).
+  totalVisited: number
 }
 
 /** Play, pause, scrub and change speed for the search animation. */
-export function PlaybackBar({ trace, playback, algorithmName }: Props) {
+export function PlaybackBar({ trace, playback, algorithmName, totalVisited }: Props) {
   const { step, playing, speed, finished } = playback
-  const explored = visitsUpTo(trace, step)
+  // Scale the sample's progress up to the real search.
+  const shown = visitsUpTo(trace, step)
+  // A truncated trace stops before the search did, so it can only be scaled
+  // by its sampling stride, not stretched to the search's full total.
+  const explored = trace.truncated
+    ? Math.min(totalVisited, shown * trace.stride)
+    : finished
+      ? totalVisited
+      : trace.visited > 0
+        ? Math.round((shown / trace.visited) * totalVisited)
+        : 0
 
   return (
     <section className="playback" aria-label="Search animation">
@@ -31,10 +43,11 @@ export function PlaybackBar({ trace, playback, algorithmName }: Props) {
         value={step}
         onChange={(event) => playback.seek(Number(event.target.value))}
         aria-label="Animation position"
-        aria-valuetext={`${explored} of ${trace.visited} intersections explored`}
+        aria-valuetext={`${explored} of ${totalVisited} intersections explored`}
       />
       <span className="playback__label">
-        {algorithmName}: {explored.toLocaleString('en-US')} / {trace.visited.toLocaleString('en-US')} explored
+        {algorithmName}: {explored.toLocaleString('en-US')} / {totalVisited.toLocaleString('en-US')} explored
+        {trace.stride > 1 && ` (showing every ${ordinal(trace.stride)} step)`}
         {trace.truncated && ' (trace cut short)'}
       </span>
       <div className="playback__speeds" role="group" aria-label="Speed">
@@ -57,4 +70,9 @@ export function PlaybackBar({ trace, playback, algorithmName }: Props) {
       )}
     </section>
   )
+}
+
+function ordinal(n: number): string {
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'
+  return `${n}${suffix}`
 }

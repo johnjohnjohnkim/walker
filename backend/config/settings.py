@@ -65,7 +65,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # The prebuilt walking graph (see `graph/build.py`). The server only reads it.
 # A relative path is taken relative to the backend directory, not to wherever
 # the server happens to be started from.
-WALKER_GRAPH_PATH = BASE_DIR / os.environ.get("WALKER_GRAPH_PATH", "data/downtown.walkgraph")
+WALKER_GRAPH_PATH = BASE_DIR / os.environ.get("WALKER_GRAPH_PATH", "data/toronto.walkgraph")
 
 # Place search. "photon" uses the public Photon server; any other value is a
 # dotted path to a class with the same interface (see geocoding/base.py).
@@ -79,6 +79,11 @@ WALKER_GEOCODER_USER_AGENT = os.environ.get(
 # with the frontend's debounce needs far fewer.
 WALKER_GEOCODE_RATE = int(os.environ.get("WALKER_GEOCODE_RATE", "10"))
 WALKER_GEOCODE_RATE_WINDOW_S = int(os.environ.get("WALKER_GEOCODE_RATE_WINDOW_S", "10"))
+# Per-client limit on /api/route. Each new route can cost a second of CPU on
+# the city graph; normal clicking, switching algorithms and comparing stay
+# well under this.
+WALKER_ROUTE_RATE = int(os.environ.get("WALKER_ROUTE_RATE", "40"))
+WALKER_ROUTE_RATE_WINDOW_S = int(os.environ.get("WALKER_ROUTE_RATE_WINDOW_S", "60"))
 # Cap on requests actually sent to the provider (cache misses), for the whole
 # process, however many clients there are: a steady rate plus a short burst.
 WALKER_GEOCODER_MAX_PER_S = float(os.environ.get("WALKER_GEOCODER_MAX_PER_S", "1"))

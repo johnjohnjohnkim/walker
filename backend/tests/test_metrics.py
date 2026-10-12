@@ -288,3 +288,24 @@ def test_measurements_never_overlap(client, graph_file, monkeypatch):
 
     assert overlap == []
     assert len(active) == 0
+
+
+def test_very_large_searches_skip_the_memory_run(client, graph_file, monkeypatch):
+    from routing import views
+
+    monkeypatch.setattr(views, "MEMORY_RUN_MAX_EVENTS", 3)
+
+    metrics = post_route(client, "dijkstra").json()["metrics"]
+
+    assert metrics["peak_memory_bytes"] is None
+    assert metrics["wall_ms"] > 0
+
+
+def test_slow_searches_skip_the_memory_run(client, graph_file, monkeypatch):
+    from routing import views
+
+    monkeypatch.setattr(views, "MEMORY_RUN_MAX_MS", 0)
+
+    metrics = post_route(client, "dijkstra").json()["metrics"]
+
+    assert metrics["peak_memory_bytes"] is None

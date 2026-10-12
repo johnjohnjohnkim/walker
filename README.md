@@ -6,6 +6,8 @@ watch how each one explores the street network.
 
 ![Dijkstra exploring downtown Toronto between Union Station and Kensington Market](docs/exploring.jpg)
 
+![Dijkstra searching the whole city from Scarborough to Vaughan](docs/city.jpg)
+
 ![The finished route with what the search cost](docs/route.jpg)
 
 - **Backend:** Python 3.12, Django, managed with [uv](https://docs.astral.sh/uv/).
@@ -22,13 +24,18 @@ You need `uv` and Node.js 22.22+ or 24.15+ (`.nvmrc` pins 24).
 cd backend
 cp .env.example .env
 uv sync
-uv run python -m graph.build --area downtown   # one-time, downloads from OpenStreetMap
+uv run python -m graph.build --area toronto   # one-time, downloads from OpenStreetMap
 uv run python manage.py runserver
 ```
 
-The build step downloads downtown Toronto's walkable streets and saves them to
-`backend/data/downtown.walkgraph`. The server only ever reads that file; it
-never contacts OpenStreetMap itself. Rerun the build to refresh the data.
+The build step downloads the walkable streets in a box around all of Toronto
+and Vaughan (which also takes in parts of Mississauga, Markham and Richmond
+Hill) and saves them to `backend/data/toronto.walkgraph`. It takes about two
+minutes and briefly needs around 5 GB of memory (OSMnx); the server then only
+ever reads the 22 MB file and never contacts OpenStreetMap itself. For a
+quick start, `--area downtown` builds a small graph in seconds; point the
+server at it with `WALKER_GRAPH_PATH=data/downtown.walkgraph` in `.env`.
+Rerun the build to refresh the data.
 
 Don't skip the `cp` step: without a `.env`, debug is off and Django refuses
 to start until `DJANGO_SECRET_KEY` is set.
@@ -68,10 +75,11 @@ Settings come from environment variables. See `backend/.env.example` and
 | `DJANGO_DEBUG` | backend | Debug mode. Off unless set; `.env.example` turns it on. |
 | `DJANGO_SECRET_KEY` | backend | Required when debug is off. |
 | `DJANGO_ALLOWED_HOSTS` | backend | Comma-separated host names. |
-| `WALKER_GRAPH_PATH` | backend | Graph file to serve. Relative paths are relative to `backend/`. Defaults to `data/downtown.walkgraph`. |
+| `WALKER_GRAPH_PATH` | backend | Graph file to serve. Relative paths are relative to `backend/`. Defaults to `data/toronto.walkgraph`. |
 | `WALKER_GEOCODER` | backend | `photon`, or a dotted path to another geocoder class. |
 | `WALKER_PHOTON_URL` | backend | Photon server. Defaults to the public one. |
 | `WALKER_GEOCODE_RATE`, `WALKER_GEOCODE_RATE_WINDOW_S` | backend | Searches allowed per client per window (10 per 10 s). |
+| `WALKER_ROUTE_RATE`, `WALKER_ROUTE_RATE_WINDOW_S` | backend | Route requests allowed per client per window (40 per minute; each new route can cost a second of CPU). |
 | `WALKER_GEOCODER_MAX_PER_S`, `WALKER_GEOCODER_BURST` | backend | Cap on requests sent to the geocoding provider, for the whole server (1 per second, bursts of 3). |
 | `VITE_MAP_STYLE_URL` | frontend | Map style JSON; swap to change tile provider. |
 | `VITE_API_PROXY_TARGET` | frontend | Where the dev server sends `/api`. |
@@ -120,6 +128,7 @@ nodes the search visited. Errors are JSON with `error` and `code`:
 | 501 | `not_implemented` | The algorithm is still a stub |
 | 422 | `outside_coverage` | A point is more than 300 m from any street on the map |
 | 422 | `no_route` | The points aren't connected |
+| 429 | `rate_limited` | More than 40 route requests in a minute from one client |
 | 500 | `algorithm_error` | The algorithm crashed, broke the event rules, looped, or gave a different result when run again (details shown in debug mode) |
 | 503 | `graph_unavailable` | No graph is loaded |
 
@@ -128,7 +137,7 @@ Every route also carries `metrics`, what the search cost:
 | Field | Meaning |
 | --- | --- |
 | `wall_ms`, `cpu_ms` | Median time of the algorithm alone over `timing_runs` clean runs (up to 5, within about 0.3 s) |
-| `peak_memory_bytes` | Most memory the algorithm's own allocations reached, from a separate run under `tracemalloc` |
+| `peak_memory_bytes` | Most memory the algorithm's own allocations reached, from a separate run under `tracemalloc`; `null` for searches over a million steps or slower than 0.5 s, which would take too long to trace |
 | `visited` | Intersections taken off the frontier and expanded |
 | `discovered` | Different intersections ever added to the frontier |
 | `frontier_pushes` | Additions to the frontier, including improved routes to a node already there |
@@ -159,7 +168,11 @@ happened (0 discover, 1 visit, 2 and 3 the same for the backward half of a
 bidirectional search), the node's index in `coordinates`, and its parent's
 index (-1 for none). The worst downtown case, Dijkstra from corner to corner,
 is 34,531 steps: about 900 KB of JSON, 220 KB gzipped, built in under 0.1 s.
-Traces over 200,000 steps are cut short and marked `truncated`.
+Searches over 150,000 steps are sampled evenly: every `stride`-th step is
+sent, so the animation still covers the whole search, and `total` gives the
+real number of steps. As a backstop, recording stops at 5 million steps
+(`truncated`); on graphs up to the city's size the runner's event cap stops
+a runaway search before that.
 
 `GET /api/geocode?q=CN%20Tower` suggests places on the map (up to 8, default
 5) as `{name, address, lon, lat}`. It forwards to the configured geocoder
@@ -244,15 +257,27 @@ than a wrong line on the map.
 
 ## The graph
 
-| Area | Nodes | Edges | File | Build | Load + index | Memory |
-| --- | --- | --- | --- | --- | --- | --- |
-| downtown | 16,139 | 43,914 | 1.1 MB | ~30 s (mostly download) | 0.2 s | ~4 MB |
+| Area | Covers | Nodes | Edges | File | Build | Load + index | Memory |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `toronto` (default) | A box around Toronto and Vaughan, also taking in parts of Mississauga, Markham and Richmond Hill | 281,575 | 765,268 | 22.2 MB | ~2 min | 0.26 s | 76 MB |
+| `central` | Humber River to Victoria Park, lake to Lawrence | 75,828 | 206,974 | 6.1 MB | ~25 s | 0.07 s | 20 MB |
+| `downtown` | Bathurst to the Don, lake to Bloor | 16,139 | 43,914 | 1.1 MB | ~15 s | 0.01 s | 4 MB |
 
-Measured on 2026-10-09 on an Apple Silicon Mac. Edges are directed, so each
-two-way street counts twice. Only the largest connected part of the network is
-kept, so every node can reach every other node. Load time is mostly building
-the reverse (incoming) edge lists and validating the file, both plain Python
-loops; expect it to grow in proportion to the edge count as the area grows.
+Measured on 2026-10-10 on an Apple Silicon Mac; build time is mostly the
+download. Edges are directed, so each two-way street counts twice. Only the
+largest connected part of the network is kept, so every node can reach every
+other node. The whole Django server with the city graph loaded uses about
+175 MB.
+
+At city scale, the longest routes are the expensive ones. Dijkstra from
+Scarborough Town Centre to Vaughan Mills (31 km) explores 226,000
+intersections in about 0.2 s; the whole request, with its checks, timing runs
+and memory run, takes about 1–2.5 s the first time (depending on load) and
+0.6 s after that (the
+measurements are cached; building the animation trace is most of the rest).
+Its trace has 488,000 steps, so every 4th is sent: 5.7 MB of JSON, 1.5 MB
+gzipped. In the browser the animation then holds about 16 frames a second
+even in headless Chrome with software rendering.
 
 The graph is stored in compressed sparse row form: one array of node
 coordinates, and for each node a slice of a shared array of outgoing edges.

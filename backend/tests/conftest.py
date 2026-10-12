@@ -37,6 +37,14 @@ def grid_edges(length: float = 100.0) -> list[tuple[int, int, float]]:
     return edges
 
 
+@pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    """Each test starts with no requests counted against any client."""
+    caches["ratelimit"].clear()
+    yield
+    caches["ratelimit"].clear()
+
+
 @pytest.fixture
 def grid_graph() -> WalkGraph:
     return WalkGraph.from_edges(grid_coords(), grid_edges(), meta={"area": "test-grid"})

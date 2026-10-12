@@ -14,7 +14,7 @@ from algorithms.runner import AlgorithmError, AlgorithmNotImplemented, run
 
 from geocoding import GeocoderUnavailable
 
-from . import geocode, graph_store
+from . import geocode, graph_store, ratelimit
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +89,12 @@ def geocode_view(request):
     except ValueError:
         return error("`limit` must be a number.", "bad_request", 400)
 
-    # REMOTE_ADDR is the direct client. Behind a reverse proxy (M10) it must
-    # come from the proxy's forwarded header instead.
-    if not geocode.allow(request.META.get("REMOTE_ADDR", "unknown")):
+    if not ratelimit.allow(
+        "geocode",
+        ratelimit.client_of(request),
+        limit=settings.WALKER_GEOCODE_RATE,
+        window_s=settings.WALKER_GEOCODE_RATE_WINDOW_S,
+    ):
         return error("Too many searches; wait a few seconds.", "rate_limited", 429)
 
     # Only suggest places on the map, so every suggestion can be routed to.
@@ -153,22 +156,39 @@ def _parse_route_request(request) -> tuple[tuple[float, float], tuple[float, flo
     return _parse_point(body, "origin"), _parse_point(body, "destination"), algorithm, trace
 
 
-# Beyond this many events the animation is cut short rather than recording
-# and sending megabytes. Downtown searches stay far below it (about 35,000 at
-# most); the whole-city graph (M9) needs a decision on a binary encoding or
-# sampling before raising it.
-MAX_TRACE_EVENTS = 200_000
+# At most this many events are sent for the animation. A longer search (on
+# the whole-city graph, Dijkstra can take over a million steps) is sampled
+# evenly instead: every k-th event is sent, so the animation still covers the
+# whole search, just more sparsely, and the browser stays responsive. (An
+# algorithm whose events repeat with a period dividing k would be sampled
+# unevenly; Dijkstra's events don't.)
+MAX_TRACE_EVENTS = 150_000
+
+# Searches with more events than this, or slower than this, skip the memory
+# measurement: under tracemalloc they would take several times longer and
+# hold the measurement lock (and every other new route) meanwhile.
+MEMORY_RUN_MAX_EVENTS = 1_000_000
+MEMORY_RUN_MAX_MS = 500
+
+# Recording stops here as a backstop memory guard (about 9 bytes per event).
+# On graphs up to the city's size the runner's event cap stops a looping
+# search first, so in practice this only matters for even bigger graphs.
+MAX_RECORDED_EVENTS = 5_000_000
 
 
 def _trace_payload(graph, trace) -> dict:
     """The search's events for the animation, compactly.
 
-    `coordinates` lists each node the search touched once, as [lon, lat].
+    `coordinates` lists each node the sent events touch once, as [lon, lat].
     `events` is a flat list of three numbers per event: the event code
     (0 discover, 1 visit, 2 discover backward, 3 visit backward), the node's
     index in `coordinates`, and its parent's index (-1 if none).
+    `stride` is k when only every k-th event was sent (1 when all were),
+    `total` the number of events the search really had, and `truncated`
+    whether recording stopped at the memory guard.
     """
-    count = len(trace)
+    recorded = len(trace)
+    stride = max(1, -(-recorded // MAX_TRACE_EVENTS))  # ceiling division
     index: dict[int, int] = {}
     coordinates: list[list[float]] = []
 
@@ -184,11 +204,22 @@ def _trace_payload(graph, trace) -> dict:
 
     events: list[int] = []
     codes, nodes, parents = trace.codes, trace.nodes, trace.parents
-    for i in range(count):
+    sent = list(range(0, recorded, stride))
+    # Always end on the search's last event (usually reaching the goal).
+    if recorded and sent[-1] != recorded - 1:
+        sent.append(recorded - 1)
+    for i in sent:
         events.append(codes[i])
         events.append(local(nodes[i]))
         events.append(local(parents[i]))
-    return {"coordinates": coordinates, "events": events, "count": count, "truncated": trace.truncated}
+    return {
+        "coordinates": coordinates,
+        "events": events,
+        "count": len(events) // 3,
+        "stride": stride,
+        "total": trace.total,
+        "truncated": trace.truncated,
+    }
 
 
 def _rounded(points):
@@ -199,6 +230,16 @@ def _rounded(points):
 
 @require_POST
 def route(request):
+    # Each new pair of points can cost a second or more of CPU (several runs
+    # of the search on the city graph), so limit how often a client can ask.
+    if not ratelimit.allow(
+        "route",
+        ratelimit.client_of(request),
+        limit=settings.WALKER_ROUTE_RATE,
+        window_s=settings.WALKER_ROUTE_RATE_WINDOW_S,
+    ):
+        return error("Too many route requests; wait a moment.", "rate_limited", 429)
+
     try:
         origin, destination, algorithm, want_trace = _parse_route_request(request)
     except BadRequest as exc:
@@ -229,7 +270,7 @@ def route(request):
     start, start_offset = snapped["origin"]
     goal, goal_offset = snapped["destination"]
     try:
-        result = run(search, graph, start, goal, record=want_trace, record_limit=MAX_TRACE_EVENTS)
+        result = run(search, graph, start, goal, record=want_trace, record_limit=MAX_RECORDED_EVENTS)
     except AlgorithmNotImplemented:
         return error(f"The {algorithm} algorithm hasn't been implemented yet.", "not_implemented", 501)
     except AlgorithmError as exc:
@@ -315,7 +356,14 @@ def _measure(algorithm, search, graph, graph_key, start, goal, result):
 
     with measure_lock:
         timing = time_search(search, graph, start, goal, expected_events=result.events)
-        memory = peak_memory_bytes(search, graph, start, goal, expected_events=result.events)
+        # tracemalloc makes Python several times slower, so very large
+        # searches skip the memory run rather than holding the server for
+        # many seconds; the card says it wasn't measured.
+        memory = (
+            peak_memory_bytes(search, graph, start, goal, expected_events=result.events)
+            if result.events <= MEMORY_RUN_MAX_EVENTS and timing.wall_ms <= MEMORY_RUN_MAX_MS
+            else None
+        )
 
     reference_key = f"shortest|{graph_key}|{start}|{goal}"
     if search is dijkstra.search:

@@ -29,6 +29,9 @@ interface Props {
 }
 
 const ROUTE_SOURCE = 'route'
+// Feature-state updates per frame when catching up after a big jump.
+const MAX_STATE_CHANGES_PER_FRAME = 20_000
+
 const ALTERNATIVES_SOURCE = 'alternatives'
 const SNAP_SOURCE = 'snap-lines'
 const EDGES_SOURCE = 'explored-edges'
@@ -233,25 +236,38 @@ export function MapView({
   // Each animation step flips the "shown" state of just the features that
   // appeared (or, scrubbing back, disappeared) since the last step. Feature
   // state changes are applied on the main thread without re-tiling the
-  // source, unlike filters or data-driven paint changes, so the cost per
-  // frame stays small however big the trace is.
+  // source, unlike filters or data-driven paint changes. A big jump (Skip,
+  // or scrubbing far) is spread over several frames, at most
+  // MAX_STATE_CHANGES_PER_FRAME changes each, so the page never freezes.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !styleLoaded || !trace) return
     const target = Math.min(traceStep, trace.steps)
-    const from = shownRef.current
-    if (target === 0 && from > 0) {
+    if (target === 0 && shownRef.current > 0) {
       map.removeFeatureState({ source: EDGES_SOURCE })
       map.removeFeatureState({ source: VISITS_SOURCE })
-    } else {
-      const [lo, hi, shown] = target > from ? [from, target, true] : [target, from, false]
+      shownRef.current = 0
+      return
+    }
+
+    let frame = 0
+    const work = () => {
+      const from = shownRef.current
+      const forward = target > from
+      const to = forward
+        ? Math.min(target, from + MAX_STATE_CHANGES_PER_FRAME)
+        : Math.max(target, from - MAX_STATE_CHANGES_PER_FRAME)
+      const [lo, hi] = forward ? [from, to] : [to, from]
       for (let t = lo; t < hi; t++) {
         const kind = trace.featureOf[t]
-        if (kind === EDGE_FEATURE) map.setFeatureState({ source: EDGES_SOURCE, id: t }, { shown })
-        else if (kind === VISIT_FEATURE) map.setFeatureState({ source: VISITS_SOURCE, id: t }, { shown })
+        if (kind === EDGE_FEATURE) map.setFeatureState({ source: EDGES_SOURCE, id: t }, { shown: forward })
+        else if (kind === VISIT_FEATURE) map.setFeatureState({ source: VISITS_SOURCE, id: t }, { shown: forward })
       }
+      shownRef.current = to
+      if (to !== target) frame = requestAnimationFrame(work)
     }
-    shownRef.current = target
+    work()
+    return () => cancelAnimationFrame(frame)
   }, [trace, traceStep, styleLoaded])
 
   useEffect(() => {

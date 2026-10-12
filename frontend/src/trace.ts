@@ -23,7 +23,9 @@ export interface DecodedTrace {
   // Each visit: a dot where the node was explored.
   visits: FeatureCollection<Point, { t: number; side: Side }>
   steps: number
+  // Visits among the events sent; the search's real count is in its metrics.
   visited: number
+  stride: number
   truncated: boolean
   // featureOf[t]: which source (if any) has the feature for event t. That
   // feature's id is t, so the map can show or hide it by id.
@@ -64,6 +66,7 @@ export function decodeTrace(trace: TracePayload): DecodedTrace {
     visits: { type: 'FeatureCollection', features: visits },
     steps: trace.count,
     visited: visits.length,
+    stride: trace.stride ?? 1,
     truncated: trace.truncated,
     featureOf,
   }

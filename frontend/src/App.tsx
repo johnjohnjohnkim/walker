@@ -164,7 +164,14 @@ export default function App() {
           )}
         </div>
       </div>
-      {trace && <PlaybackBar trace={trace} playback={playback} algorithmName={algorithmName} />}
+      {trace && state.route && (
+        <PlaybackBar
+          trace={trace}
+          playback={playback}
+          algorithmName={algorithmName}
+          totalVisited={state.route.metrics.visited}
+        />
+      )}
       <HealthBadge />
     </div>
   )

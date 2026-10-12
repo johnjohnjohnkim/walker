@@ -42,7 +42,8 @@ export interface SearchMetrics {
   wall_ms: number
   cpu_ms: number
   timing_runs: number
-  peak_memory_bytes: number
+  // null when the search was too large to measure memory in reasonable time.
+  peak_memory_bytes: number | null
   visited: number
   discovered: number
   frontier_pushes: number
@@ -64,6 +65,10 @@ export interface TracePayload {
   coordinates: LngLat[]
   events: number[]
   count: number
+  // Every `stride`-th event of the search was sent (1 = all of them).
+  stride: number
+  // How many events the search really had.
+  total: number
   truncated: boolean
 }
 

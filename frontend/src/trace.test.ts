@@ -12,6 +12,8 @@ const PAYLOAD: TracePayload = {
   ],
   events: [0, 0, -1, 1, 0, -1, 0, 1, 0, 2, 2, -1, 3, 2, -1, 2, 1, 2],
   count: 6,
+  stride: 1,
+  total: 6,
   truncated: false,
 }
 
@@ -40,7 +42,7 @@ describe('decodeTrace', () => {
   })
 
   it('handles an empty trace', () => {
-    const decoded = decodeTrace({ coordinates: [], events: [], count: 0, truncated: false })
+    const decoded = decodeTrace({ coordinates: [], events: [], count: 0, stride: 1, total: 0, truncated: false })
 
     expect(decoded.steps).toBe(0)
     expect(decoded.visits.features).toEqual([])

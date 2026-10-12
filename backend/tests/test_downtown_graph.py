@@ -10,7 +10,7 @@ from graph.spatial import NodeIndex, haversine_m
 
 PATH = default_path("downtown")
 
-pytestmark = pytest.mark.skipif(not PATH.exists(), reason="run `uv run python -m graph.build` first")
+pytestmark = pytest.mark.skipif(not PATH.exists(), reason="run `uv run python -m graph.build --area downtown` first")
 
 
 @pytest.fixture(scope="module")

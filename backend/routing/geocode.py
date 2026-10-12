@@ -102,18 +102,3 @@ def search(query: str, *, bbox: BBox, limit: int) -> list[Place]:
         raise
     cache.set(key, places, CACHE_TTL_S)
     return places
-
-
-def allow(client: str) -> bool:
-    """Fixed-window rate limit: False once `client` has used up this window."""
-    cache = caches["ratelimit"]
-    window = settings.WALKER_GEOCODE_RATE_WINDOW_S
-    key = f"geocode-rate:{client}"
-    # add() only sets the key if it's missing, starting a new window.
-    cache.add(key, 0, window)
-    try:
-        count = cache.incr(key)
-    except ValueError:  # expired between add() and incr()
-        cache.set(key, 1, window)
-        count = 1
-    return count <= settings.WALKER_GEOCODE_RATE
