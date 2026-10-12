@@ -309,3 +309,35 @@ def test_slow_searches_skip_the_memory_run(client, graph_file, monkeypatch):
     metrics = post_route(client, "dijkstra").json()["metrics"]
 
     assert metrics["peak_memory_bytes"] is None
+
+
+def test_measurements_never_overlap_across_processes(tmp_path):
+    """Two server worker processes must not time searches at the same moment."""
+    import multiprocessing
+
+    path = str(tmp_path / "lock")
+    log = tmp_path / "log"
+
+    procs = [multiprocessing.get_context("fork").Process(target=_hold, args=(path, str(log))) for _ in range(3)]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(timeout=10)
+
+    spans = sorted(tuple(map(float, line.split())) for line in log.read_text().split("\n") if line)
+    assert len(spans) == 3
+    for (_, end), (start, _) in zip(spans, spans[1:]):
+        assert start >= end  # each began after the previous one finished
+
+
+def _hold(path, log):
+    import time as _time
+
+    from algorithms.metrics import _MeasureLock
+
+    with _MeasureLock(path):
+        start = _time.monotonic()
+        _time.sleep(0.05)
+        end = _time.monotonic()
+    with open(log, "a") as f:
+        f.write(f"{start} {end}\n")

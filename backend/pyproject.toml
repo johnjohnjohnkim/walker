@@ -5,6 +5,7 @@ description = "Walking-route backend for Walker: graph data, search algorithms a
 requires-python = ">=3.12"
 dependencies = [
     "django>=6.1.2",
+    "gunicorn>=26.2.0",
     "python-dotenv>=1.2.4",
 ]
 

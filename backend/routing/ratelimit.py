@@ -1,5 +1,6 @@
 """A small per-client fixed-window rate limiter on Django's cache."""
 
+from django.conf import settings
 from django.core.cache import caches
 
 
@@ -18,6 +19,17 @@ def allow(scope: str, client: str, *, limit: int, window_s: int) -> bool:
 
 
 def client_of(request) -> str:
-    # REMOTE_ADDR is the direct client. Behind a reverse proxy (M10) it must
-    # come from the proxy's forwarded header instead.
+    """The address to rate-limit by.
+
+    Behind our own reverse proxy (Caddy, in production), every request comes
+    from the proxy, so the visitor's address is the one the proxy appended to
+    X-Forwarded-For: the last entry. Earlier entries came from the visitor and
+    can be faked, so they are ignored. Without a trusted proxy, use the
+    direct connection's address.
+    """
+    if settings.WALKER_BEHIND_PROXY:
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        last = forwarded.rsplit(",", 1)[-1].strip()
+        if last:
+            return last
     return request.META.get("REMOTE_ADDR", "unknown")

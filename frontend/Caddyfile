@@ -1,0 +1,26 @@
+# WALKER_DOMAIN is the site's address, e.g. 15-222-1-2.sslip.io. Caddy gets
+# and renews the HTTPS certificate for it by itself. Set it to ":80" to
+# serve plain HTTP (for trying it out on your own computer).
+{$WALKER_DOMAIN} {
+	encode zstd gzip
+
+	# The API goes to the Django container.
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else is the React app. Unknown paths get index.html.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

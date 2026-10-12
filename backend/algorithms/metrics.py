@@ -23,7 +23,10 @@ they don't depend on timing; see `runner.SearchResult`.
 
 from __future__ import annotations
 
+import fcntl
+import os
 import statistics
+import tempfile
 import threading
 import time
 import tracemalloc
@@ -39,10 +42,41 @@ from .runner import DEFAULT_TIME_LIMIT_S, AlgorithmError, SearchFunction, max_ev
 TIMING_BUDGET_S = 0.3
 MAX_RUNS = 5
 
-# One measurement at a time in this process: searches timed side by side
-# (two browser tabs, or a comparison) would slow each other down and the
-# cached numbers would be wrong for good. Waiting is cheap next to that.
-measure_lock = threading.Lock()
+class _MeasureLock:
+    """One measurement at a time on this machine: searches timed side by side
+    (two browser tabs, a comparison, or two server worker processes) would
+    slow each other down, and the cached numbers would be wrong for good.
+    Waiting is cheap next to that.
+
+    A thread lock covers threads in one process; a file lock (flock) covers
+    the other worker processes.
+    """
+
+    def __init__(self, path: str) -> None:
+        self._thread_lock = threading.Lock()
+        self._path = path
+        self._file = None
+
+    def __enter__(self):
+        self._thread_lock.acquire()
+        try:
+            self._file = open(self._path, "a")
+            fcntl.flock(self._file, fcntl.LOCK_EX)
+        except BaseException:
+            self._thread_lock.release()
+            raise
+        return self
+
+    def __exit__(self, *exc) -> None:
+        try:
+            fcntl.flock(self._file, fcntl.LOCK_UN)
+            self._file.close()
+        finally:
+            self._file = None
+            self._thread_lock.release()
+
+
+measure_lock = _MeasureLock(os.path.join(tempfile.gettempdir(), "walker-measure.lock"))
 
 # Keeps two memory measurements from overlapping. tracemalloc counts
 # allocations from every thread, so the figure is only exact when no other

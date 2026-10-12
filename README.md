@@ -66,6 +66,31 @@ cd frontend && npm test
 
 `npm run build` type-checks and builds the frontend, and `npm run lint` lints it.
 
+## Deploying
+
+`docker-compose.yml` runs Walker on one machine as two containers: `web`
+(Caddy serving the built React app, forwarding `/api` and getting an HTTPS
+certificate automatically) and `backend` (Django under gunicorn). The graph
+file is built on a developer machine and mounted read-only; the server never
+needs OSMnx.
+
+```sh
+cp deploy/.env.example deploy/.env   # set WALKER_DOMAIN, DJANGO_ALLOWED_HOSTS, DJANGO_SECRET_KEY
+# copy backend/data/toronto.walkgraph onto the machine
+docker compose up -d --build
+```
+
+The backend runs two gunicorn worker processes that share one copy of the
+graph (it is loaded before they start), about 325 MB in total with four
+cross-city routes running at once, so a 1 GB server is enough. A worker that
+stops answering for 30 s, such as one stuck in a search that never yields, is
+replaced automatically. Caches and rate limits are per worker, so the effective
+rate limits are up to twice the configured ones; measurements still run one
+at a time across both workers (a file lock), so they never skew each other. Without a domain, `WALKER_DOMAIN` can be the server's IP in
+[sslip.io](https://sslip.io) form (e.g. `15-222-1-2.sslip.io`), which still
+gets a real certificate. Behind Caddy, rate limits use the visitor's address
+from `X-Forwarded-For` (`WALKER_BEHIND_PROXY`, set by the compose file).
+
 ## Configuration
 
 Settings come from environment variables. See `backend/.env.example` and
@@ -81,6 +106,8 @@ Settings come from environment variables. See `backend/.env.example` and
 | `WALKER_PHOTON_URL` | backend | Photon server. Defaults to the public one. |
 | `WALKER_GEOCODE_RATE`, `WALKER_GEOCODE_RATE_WINDOW_S` | backend | Searches allowed per client per window (10 per 10 s). |
 | `WALKER_ROUTE_RATE`, `WALKER_ROUTE_RATE_WINDOW_S` | backend | Route requests allowed per client per window (40 per minute; each new route can cost a second of CPU). |
+| `WALKER_BEHIND_PROXY` | backend | `true` behind our own reverse proxy (the Docker setup), so rate limits use the visitor's address from `X-Forwarded-For`. Leave off otherwise. |
+| `WALKER_DOMAIN` | deploy | The site's address for Caddy and its HTTPS certificate (Docker setup only). |
 | `WALKER_GEOCODER_MAX_PER_S`, `WALKER_GEOCODER_BURST` | backend | Cap on requests sent to the geocoding provider, for the whole server (1 per second, bursts of 3). |
 | `VITE_MAP_STYLE_URL` | frontend | Map style JSON; swap to change tile provider. |
 | `VITE_API_PROXY_TARGET` | frontend | Where the dev server sends `/api`. |

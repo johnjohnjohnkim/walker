@@ -43,6 +43,26 @@ if not SECRET_KEY:
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
+# True when the app runs behind our own reverse proxy (Caddy in the Docker
+# setup), which sets X-Forwarded-For and X-Forwarded-Proto. Only turn it on
+# when that's so: otherwise visitors could fake their address.
+WALKER_BEHIND_PROXY = env_bool("WALKER_BEHIND_PROXY", False)
+if WALKER_BEHIND_PROXY:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # The container's own health check calls http://localhost:8000. That's
+    # safe to allow: the backend's port isn't published, and Caddy only
+    # forwards requests for the site's real address.
+    if "localhost" not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS = [*ALLOWED_HOSTS, "localhost"]
+
+# Errors and warnings to the console, where `docker compose logs` shows them.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": os.environ.get("WALKER_LOG_LEVEL", "INFO")},
+}
+
 # The API is a stateless JSON service, so the session, auth and admin apps
 # are left out on purpose. There is no database either: routing data lives
 # in an in-memory graph.

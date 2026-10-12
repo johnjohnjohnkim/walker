@@ -1,6 +1,7 @@
 # Local planning and work notes
 MILESTONES.md
 journal/
+deploy/deploy-guide.pdf
 
 # Secrets and local overrides
 .env

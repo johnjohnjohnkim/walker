@@ -10,5 +10,6 @@ os.environ["DJANGO_SECRET_KEY"] = "test-only-key"
 os.environ["DJANGO_ALLOWED_HOSTS"] = "localhost,127.0.0.1"
 # Never call a real geocoding service from tests.
 os.environ["WALKER_GEOCODER"] = "tests.fakes.FakeGeocoder"
+os.environ["WALKER_BEHIND_PROXY"] = "false"
 
 from .settings import *  # noqa: E402,F403

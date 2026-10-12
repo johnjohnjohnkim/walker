@@ -1,6 +1,10 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Feature, FeatureCollection, LineString } from 'geojson'
 import * as maplibregl from 'maplibre-gl'
+// MapLibre works out its worker's address at run time, which the production
+// build can't see, so the worker file would be left out. Importing it as a
+// URL makes Vite ship it, and MapLibre is told where it is.
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useRef, useState } from 'react'
 import type { LngLat } from '../api'
 import { INITIAL_CENTER, INITIAL_ZOOM, MAP_STYLE_URL } from '../config'
@@ -64,6 +68,8 @@ function markerElement(className: string): HTMLElement {
   el.className = className
   return el
 }
+
+maplibregl.setWorkerUrl(workerUrl)
 
 /** Draws the map, the two chosen points and the route. Holds no route state itself. */
 export function MapView({

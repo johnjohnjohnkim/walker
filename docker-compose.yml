@@ -1,0 +1,46 @@
+# Runs Walker on one machine: `docker compose up -d --build`.
+# Settings come from deploy/.env (copy deploy/.env.example).
+
+# Keep each container's logs to at most 30 MB.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  backend:
+    build: ./backend
+    env_file: deploy/.env
+    environment:
+      WALKER_BEHIND_PROXY: "true"
+      WALKER_GRAPH_PATH: /graph/toronto.walkgraph
+    volumes:
+      # The graph file, built on your own computer and copied to the server.
+      - ./backend/data:/graph:ro
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+
+  web:
+    build: ./frontend
+    # One settings file for both boxes keeps setup simple. Caddy only reads
+    # WALKER_DOMAIN from it.
+    env_file: deploy/.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Caddy keeps its HTTPS certificates here, so restarts don't ask for new ones.
+      - caddy-data:/data
+    depends_on:
+      - backend
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  caddy-data:
