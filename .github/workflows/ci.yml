@@ -12,10 +12,12 @@ on:
   pull_request:
   workflow_dispatch:
 
-# A newer push to the same branch cancels an older run that's still going.
+# A newer push to a branch cancels that branch's older run, except on main:
+# there a run may be deploying, and stopping a deploy halfway could leave the
+# server half-updated. Runs on main queue instead.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -111,24 +113,39 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Send the latest compose file
-        run: |
-          scp -i ~/.ssh/deploy_key docker-compose.yml \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:walker/docker-compose.yml"
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: scp -i ~/.ssh/deploy_key docker-compose.yml "$DEPLOY_USER@$DEPLOY_HOST:walker/docker-compose.yml"
 
       - name: Pull the new images and restart
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" bash -s <<'SCRIPT'
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" bash -s <<'SCRIPT'
           set -euo pipefail
           cd ~/walker
           docker compose pull
           docker compose up -d --remove-orphans
-          # Wait up to two minutes for the backend to report healthy.
+          # Wait up to two minutes for the backend to report healthy. While
+          # it's being recreated it may have no container id yet; that just
+          # counts as "not healthy yet".
+          status=missing
           for i in $(seq 1 40); do
-            status=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q backend)")
+            cid=$(docker compose ps -q backend || true)
+            if [ -n "$cid" ]; then
+              status=$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo missing)
+            fi
             if [ "$status" = healthy ]; then echo "backend is healthy"; break; fi
             sleep 3
           done
-          [ "$status" = healthy ] || { docker compose logs --tail 50 backend; exit 1; }
-          # Remove old images so the disk doesn't fill up.
+          if [ "$status" != healthy ]; then
+            echo "backend did not become healthy (last status: $status)"
+            docker compose ps
+            docker compose logs --tail 50 backend
+            exit 1
+          fi
+          # Remove old, untagged images so the disk doesn't fill up.
           docker image prune -f
           SCRIPT

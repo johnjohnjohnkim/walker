@@ -28,6 +28,8 @@ services:
       interval: 30s
       timeout: 5s
       start_period: 20s
+      # Check every 3 s while starting, so a deploy sees "healthy" quickly.
+      start_interval: 3s
 
   web:
     image: ghcr.io/johnjohnjohnkim/walker-web:latest
