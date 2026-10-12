@@ -9,9 +9,13 @@ dependencies = [
 ]
 
 [dependency-groups]
+build = [
+    "osmnx>=2.1.1",
+]
 dev = [
     "pytest>=9.1.1",
     "pytest-django>=4.14.0",
+    { include-group = "build" },
 ]
 
 [tool.uv]

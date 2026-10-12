@@ -59,6 +59,11 @@ ROOT_URLCONF = "config.urls"
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+# The prebuilt walking graph (see `graph/build.py`). The server only reads it.
+# A relative path is taken relative to the backend directory, not to wherever
+# the server happens to be started from.
+WALKER_GRAPH_PATH = BASE_DIR / os.environ.get("WALKER_GRAPH_PATH", "data/downtown.walkgraph")
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = False
