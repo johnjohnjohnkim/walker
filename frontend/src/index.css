@@ -1,14 +1,38 @@
+/* Night survey: black instruments over a dark map. The interface stays in
+   black, greys and white so the map, the search and the route carry the
+   colour; the only hue is Western purple, reserved for the route. */
 :root {
-  --surface: #ffffff;
-  --text: #202124;
-  --text-muted: #5f6368;
-  --ok: #188038;
-  --accent: #1a73e8;
-  --down: #d93025;
-  --shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+  --bg: #000000;
+  --surface: #000000;
+  /* Hover, active and selected rows. */
+  --surface-raised: #1c1c1c;
+  /* Decorative card frames. */
+  --line: #333333;
+  /* Outlines that are the only edge of a control (fields, buttons): 3.2:1
+     on black, above the 3:1 WCAG asks for. */
+  --line-strong: #5e5e5e;
+  /* Rules between table rows. */
+  --line-faint: #222222;
+  --text: #ededed;
+  /* 8.3:1 on black, for secondary text. */
+  --text-muted: #a3a3a3;
+  /* Disabled controls only (WCAG exempts them). */
+  --text-faint: #5e5e5e;
+  /* Selected controls: white with black text. */
+  --ink: #ffffff;
+  --on-ink: #000000;
+  --error: #ff8f8f;
+  --route: #4f2683;
+  --radius: 4px;
+  --radius-small: 3px;
 
-  font-family: Roboto, Arial, system-ui, sans-serif;
+  --font-ui: 'IBM Plex Sans', system-ui, sans-serif;
+  /* Only for measured numbers, so they line up like instrument readouts. */
+  --font-data: 'IBM Plex Mono', ui-monospace, monospace;
+
+  font-family: var(--font-ui);
   color: var(--text);
+  color-scheme: dark;
 }
 
 * {
@@ -23,7 +47,7 @@ body,
 }
 
 body {
-  background: var(--surface);
+  background: var(--bg);
 }
 
 .app {
@@ -38,27 +62,45 @@ body {
   height: 100%;
 }
 
+/* Every floating piece of interface shares one frame. */
+.panel,
+.metrics,
+.compare,
+.playback,
+.health-badge,
+.search__list,
+.search__note--visible {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Measured values. */
+.panel__duration,
+.panel__distance,
+.metrics__row dd,
+.compare__table td,
+.playback__label,
+.health-badge {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
 .health-badge {
   position: absolute;
   bottom: 24px;
   left: 16px;
-  padding: 6px 12px;
-  border-radius: 16px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font-size: 13px;
+  padding: 6px 10px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
-.health-badge--ok {
-  color: var(--ok);
-}
-
 .health-badge--down {
-  color: var(--down);
+  color: var(--error);
 }
 
-/* The left column: directions panel with the metrics card beneath. */
+/* The left column: directions panel with the cards beneath. */
 .sidebar {
   position: absolute;
   top: 16px;
@@ -80,27 +122,27 @@ body {
   gap: 12px;
   min-height: 0;
   overflow-y: auto;
-  /* Room for the cards' shadows inside the scroll area. */
-  margin: -4px;
-  padding: 4px;
 }
 
 .sidebar__cards:empty {
   display: none;
 }
 
+/* ---------------------------------------------------------------- panel */
+
 .panel {
+  position: relative;
+  /* Above the cards below it, so suggestions drop down over them. */
+  z-index: 1;
   flex: none;
   padding: 16px 20px;
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
 .panel__title {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
   font-size: 18px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .panel__hint,
@@ -118,12 +160,12 @@ body {
 }
 
 .panel__duration {
-  font-size: 22px;
-  color: var(--ok);
+  font-size: 24px;
+  font-weight: 500;
 }
 
 .panel__distance {
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 
@@ -135,127 +177,19 @@ body {
 .panel__error {
   margin: 0;
   font-size: 14px;
-  color: var(--down);
+  color: var(--error);
 }
 
-.panel__button {
-  padding: 6px 16px;
-  border: 1px solid #dadce0;
-  border-radius: 18px;
-  background: var(--surface);
-  color: var(--accent);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.panel__button:hover {
-  background: #f1f3f4;
-}
-
-.origin-marker {
-  width: 16px;
-  height: 16px;
-  border: 3px solid #202124;
-  border-radius: 50%;
-  background: var(--surface);
-  cursor: pointer;
-}
-
-.picker {
-  margin-bottom: 12px;
-}
-
-.picker__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.picker__chip {
-  padding: 6px 12px;
-  border: 1px solid #dadce0;
-  border-radius: 16px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.picker__chip:hover:not(:disabled) {
-  background: #f1f3f4;
-}
-
-.picker__chip--selected,
-.picker__chip--selected:hover:not(:disabled) {
-  border-color: transparent;
-  background: #e8f0fe;
-  color: var(--accent);
-  font-weight: 500;
-}
-
-.picker__chip:disabled {
-  color: #bdc1c6;
-  cursor: not-allowed;
-}
-
-.picker__description {
-  margin: 8px 0 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.panel {
-  position: relative;
-  /* Above the cards below it, so suggestions drop down over them. */
-  z-index: 1;
-}
-
-/* Clips the progress bar to the panel's rounded top edge. The panel itself
-   must not clip, or it would cut off the search suggestions. */
+/* Clips the progress bar to the panel's top edge. The panel itself must not
+   clip, or it would cut off the search suggestions. */
 .panel__progress-track {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2px;
   overflow: hidden;
-  border-radius: 8px 8px 0 0;
-}
-
-.panel__searches {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-  /* Room for the swap button on the right. */
-  padding-right: 40px;
-}
-
-.panel__swap {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  color: var(--text-muted);
-  font-size: 18px;
-  cursor: pointer;
-}
-
-.panel__swap:hover:not(:disabled) {
-  background: #f1f3f4;
-}
-
-.panel__swap:disabled {
-  color: #dadce0;
-  cursor: default;
+  border-radius: var(--radius) var(--radius) 0 0;
 }
 
 /* An indeterminate bar across the top of the panel while a route loads. */
@@ -264,8 +198,8 @@ body {
   top: 0;
   left: 0;
   width: 30%;
-  height: 3px;
-  background: var(--accent);
+  height: 2px;
+  background: var(--ink);
   animation: panel-progress 1.1s ease-in-out infinite;
 }
 
@@ -286,16 +220,118 @@ body {
   }
 }
 
+.panel__searches {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  /* Room for the swap button on the right. */
+  padding-right: 40px;
+}
+
+.panel__swap {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.panel__swap:hover:not(:disabled) {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.panel__swap:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
 .panel__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .panel__actions:empty {
   display: none;
 }
+
+/* Outlined buttons: Compare, Clear, playback speeds and Skip. */
+.panel__button,
+.playback__speed,
+.playback__skip,
+.picker__chip {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.panel__button {
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+.panel__button:hover,
+.playback__speed:hover,
+.playback__skip:hover,
+.picker__chip:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+/* --------------------------------------------------------------- picker */
+
+.picker {
+  margin-bottom: 12px;
+}
+
+.picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.picker__chip {
+  padding: 5px 11px;
+  font-size: 13px;
+}
+
+/* The selected item, here and in the playback speeds: solid white. */
+.picker__chip--selected,
+.picker__chip--selected:hover:not(:disabled),
+.playback__speed--selected,
+.playback__speed--selected:hover {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 500;
+}
+
+.picker__chip:disabled {
+  border-color: var(--line);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.picker__description {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------- search */
 
 .search {
   position: relative;
@@ -304,35 +340,45 @@ body {
   gap: 10px;
 }
 
+/* The same shapes as the map markers: a ring for the start, a diamond for
+   the destination. */
 .search__marker {
   flex: none;
   width: 12px;
   height: 12px;
-  border-radius: 50%;
 }
 
 .search__marker--origin {
-  border: 2px solid #202124;
-  background: var(--surface);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
 }
 
 .search__marker--destination {
-  background: #ea4335;
+  width: 10px;
+  height: 10px;
+  margin: 0 1px;
+  background: var(--ink);
+  transform: rotate(45deg);
 }
 
 .search__input {
   flex: 1;
   min-width: 0;
   padding: 9px 12px;
-  border: 1px solid #dadce0;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--text);
   font: inherit;
   font-size: 14px;
-  color: var(--text);
+}
+
+.search__input::placeholder {
+  color: #7a7a7a;
 }
 
 .search__input:focus {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ink);
   outline-offset: -1px;
   border-color: transparent;
 }
@@ -344,11 +390,8 @@ body {
   left: 22px;
   right: 0;
   margin: 0;
-  padding: 6px 0;
+  padding: 4px 0;
   list-style: none;
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
 .search__option {
@@ -359,7 +402,7 @@ body {
 }
 
 .search__option--active {
-  background: #f1f3f4;
+  background: var(--surface-raised);
 }
 
 .search__name {
@@ -393,16 +436,45 @@ body {
   overflow: visible;
   clip-path: none;
   white-space: normal;
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
   font-size: 13px;
   color: var(--text-muted);
 }
 
 .search__note--error {
-  color: var(--down);
+  color: var(--error);
 }
+
+/* -------------------------------------------------------------- markers */
+
+.origin-marker {
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--on-ink);
+  box-shadow: 0 0 0 2px var(--on-ink);
+  cursor: pointer;
+}
+
+/* MapLibre positions the marker element with its own transform, so the
+   diamond is drawn by a rotated child. */
+.destination-marker {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.destination-marker::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border: 2px solid var(--on-ink);
+  background: var(--ink);
+  outline: 1px solid var(--ink);
+  transform: rotate(45deg);
+}
+
+/* ------------------------------------------------------------- playback */
 
 .playback {
   position: absolute;
@@ -415,61 +487,291 @@ body {
   gap: 10px 14px;
   width: min(640px, calc(100% - 32px));
   padding: 10px 16px;
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
   font-size: 13px;
 }
 
 .playback__play {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border: none;
   border-radius: 50%;
-  background: var(--accent);
-  color: white;
-  font-size: 14px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 13px;
   cursor: pointer;
 }
 
 .playback__scrubber {
   flex: 1;
   min-width: 160px;
-  accent-color: #9334e6;
+  accent-color: var(--ink);
 }
 
 .playback__label {
   flex-basis: 100%;
   order: 3;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
 .playback__speeds {
   display: flex;
-  gap: 2px;
+  gap: 4px;
 }
 
 .playback__speed,
 .playback__skip {
-  padding: 4px 8px;
-  border: 1px solid #dadce0;
-  border-radius: 12px;
-  background: var(--surface);
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+/* -------------------------------------------------------------- metrics */
+
+.metrics {
+  flex: none;
+  font-size: 13px;
+}
+
+.metrics__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
   color: var(--text);
   font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
   cursor: pointer;
 }
 
-.playback__speed--selected {
-  border-color: transparent;
-  background: #e8f0fe;
-  color: var(--accent);
+.metrics__header:hover {
+  background: var(--surface-raised);
 }
 
-/* Phones: the panel spans the top, so the badge sits just above the
-   playback bar on the left, and the bar keeps clear of the map's
-   attribution (which must stay visible) and its zoom buttons, which pinch
-   zoom makes unnecessary on touch screens. */
+.metrics__list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  margin: 0;
+  padding: 0 20px 4px;
+}
+
+.metrics__row dt {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.metrics__row dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+}
+
+.metrics__note {
+  margin: 10px 20px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.metrics__list--explained {
+  grid-template-columns: 1fr;
+}
+
+.metrics__help {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.metrics__explain {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ----------------------------------------------------------- comparison */
+
+.compare {
+  flex: none;
+  padding: 12px 20px 14px;
+  font-size: 13px;
+}
+
+.compare__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.compare__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.compare__close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.compare__close:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.compare__table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+}
+
+.compare__table th,
+.compare__table td {
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--line-faint);
+  text-align: left;
+  font-weight: normal;
+}
+
+.compare__table thead th {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.compare__row--selected {
+  background: var(--surface-raised);
+}
+
+/* Information, not a disabled control, so it keeps readable contrast. */
+.compare__row--missing {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.compare__pick {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--text-muted);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.compare__row--selected .compare__pick {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* The best value in a column. Weight and a mark rather than a colour, to
+   stay within the monochrome palette. */
+.compare__best {
+  font-weight: 600;
+}
+
+/* Decorative for screen readers (empty alternative text); the cell also
+   has a visually hidden "best" label. */
+.compare__best::after {
+  content: ' ◆' / '';
+  font-size: 9px;
+  vertical-align: 1px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.compare__extra {
+  color: var(--text-muted);
+}
+
+.compare__error {
+  color: var(--error);
+}
+
+.compare__note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ------------------------------------------------------- map controls */
+
+/* Scoped under .map: MapLibre's own stylesheet loads after this one, so
+   equally specific rules would lose to it. */
+.map .maplibregl-ctrl.maplibregl-ctrl-attrib,
+.map .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
+  background: rgba(0, 0, 0, 0.8);
+  color: #b5b5b5;
+}
+
+.map .maplibregl-ctrl-attrib a {
+  color: #e0e0e0;
+}
+
+.map .maplibregl-ctrl-attrib-button {
+  background-color: rgba(255, 255, 255, 0.85);
+}
+
+.map .maplibregl-ctrl-group {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.map .maplibregl-ctrl-group:not(:empty) {
+  box-shadow: none;
+}
+
+.map .maplibregl-ctrl-group button + button {
+  border-top-color: var(--line);
+}
+
+.map .maplibregl-ctrl-group button:not(:disabled):hover {
+  background-color: var(--surface-raised);
+}
+
+/* The control icons are dark drawings; invert them for the dark frame. */
+.map .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.3);
+}
+
+/* Visible keyboard focus everywhere, without outlines on mouse clicks. */
+button:focus-visible,
+input[type='range']:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- phones */
+
+/* The panel spans the top, so the badge sits just above the playback bar on
+   the left, and the bar keeps clear of the map's attribution (which must
+   stay visible) and its zoom buttons, which pinch zoom makes unnecessary on
+   touch screens. */
 @media (max-width: 700px) {
   /* The attribution wraps onto two lines at phone width. */
   .playback {
@@ -494,190 +796,4 @@ body {
   .sidebar--comparing .metrics {
     display: none;
   }
-}
-
-.metrics {
-  flex: none;
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font-size: 13px;
-}
-
-.metrics__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 8px;
-  background: none;
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-
-.metrics__header:hover {
-  background: #f8f9fa;
-}
-
-.metrics__list {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 16px;
-  margin: 0;
-  padding: 0 20px 4px;
-}
-
-.metrics__row dt {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.metrics__row dd {
-  margin: 2px 0 0;
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-}
-
-.metrics__note {
-  margin: 8px 20px 12px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.metrics__list--explained {
-  grid-template-columns: 1fr;
-}
-
-.metrics__help {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.metrics__explain {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  cursor: pointer;
-}
-
-.metrics__explain:hover {
-  text-decoration: underline;
-}
-
-.compare {
-  flex: none;
-  padding: 12px 20px 14px;
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font-size: 13px;
-}
-
-.compare__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.compare__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.compare__close {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  color: var(--text-muted);
-  font-size: 18px;
-  cursor: pointer;
-}
-
-.compare__close:hover {
-  background: #f1f3f4;
-}
-
-.compare__table {
-  width: 100%;
-  margin-top: 6px;
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-
-.compare__table th,
-.compare__table td {
-  padding: 6px 4px;
-  border-bottom: 1px solid #f1f3f4;
-  text-align: left;
-  font-weight: normal;
-}
-
-.compare__table thead th {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.compare__row--selected {
-  background: #e8f0fe;
-}
-
-/* Muted but still readable (4.5:1 contrast); it is information, not a
-   disabled control. */
-.compare__row--missing {
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-.compare__pick {
-  padding: 0;
-  border: none;
-  background: none;
-  color: #1967d2;
-  font: inherit;
-  cursor: pointer;
-}
-
-.compare__row--selected .compare__pick {
-  font-weight: 500;
-}
-
-/* Darker shades than the usual accent colours, so they keep 4.5:1 contrast
-   on the selected row's blue tint. */
-.compare__best {
-  font-weight: 500;
-  color: #137333;
-}
-
-.compare__extra {
-  color: #c5221f;
-}
-
-.compare__error {
-  color: #c5221f;
-}
-
-.compare__note {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* Visible keyboard focus everywhere, without outlines on mouse clicks. */
-button:focus-visible,
-input[type='range']:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }

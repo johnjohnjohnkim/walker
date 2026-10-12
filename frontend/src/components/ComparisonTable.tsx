@@ -79,8 +79,14 @@ export const ComparisonTable = memo(function ComparisonTable({
                   {formatDistance(entry.route.route.distance_m)}
                   {!m.is_shortest && <span className="compare__extra"> +{m.extra_distance_pct}%</span>}
                 </td>
-                <td className={m.visited === fewestExplored ? 'compare__best' : undefined}>{formatCount(m.visited)}</td>
-                <td className={m.wall_ms === fastest ? 'compare__best' : undefined}>{formatMs(m.wall_ms)}</td>
+                <td className={m.visited === fewestExplored ? 'compare__best' : undefined}>
+                  {formatCount(m.visited)}
+                  {m.visited === fewestExplored && <span className="visually-hidden"> (fewest)</span>}
+                </td>
+                <td className={m.wall_ms === fastest ? 'compare__best' : undefined}>
+                  {formatMs(m.wall_ms)}
+                  {m.wall_ms === fastest && <span className="visually-hidden"> (fastest)</span>}
+                </td>
               </tr>
             )
           })}
@@ -88,7 +94,7 @@ export const ComparisonTable = memo(function ComparisonTable({
       </table>
       <p className="compare__note">
         {done.length > 1
-          ? "Grey lines on the map are the other algorithms' routes. Pick one to watch it."
+          ? "◆ marks the best in each column. Grey lines on the map are the other algorithms' routes; pick one to watch it."
           : 'Write more algorithms to compare them here.'}
       </p>
     </section>

@@ -1,29 +1,47 @@
 import type { ExpressionSpecification } from 'maplibre-gl'
+import { EXPLORED_BACKWARD, EXPLORED_FORWARD } from './mapTheme'
 
-/**
- * The layer id to insert route layers before: the first label layer above the
- * last 3D building layer. Route lines then sit on top of buildings (which
- * would otherwise hide them) but under street names, which stay readable.
- */
-export function routeLayerPosition(layers: { id: string; type: string }[]): string | undefined {
-  let lastExtrusion = -1
-  layers.forEach((layer, i) => {
-    if (layer.type === 'fill-extrusion') lastExtrusion = i
-  })
-  return layers.find((layer, i) => i > lastExtrusion && layer.type === 'symbol')?.id
+export interface StyleLayer {
+  id: string
+  type: string
+  'source-layer'?: string
 }
 
-// The forward search in purple, the backward one (bidirectional) in orange,
-// each going from light (explored early) to dark (explored late), so the
-// order of exploration shows even in a still picture.
+// Map layers a route must never be hidden under.
+function covers(layer: StyleLayer): boolean {
+  return (
+    layer.type === 'fill-extrusion' ||
+    layer['source-layer'] === 'transportation' ||
+    layer['source-layer'] === 'building'
+  )
+}
+
+/**
+ * The layer id to insert route layers before: the first label layer after
+ * the style's last road or building layer. The route then sits on top of
+ * everything it could be hidden by (some styles draw roads after their first
+ * labels, others draw 3D buildings last) but under the street names and
+ * place labels that follow, which stay readable.
+ */
+export function routeLayerPosition(layers: StyleLayer[]): string | undefined {
+  let lastCovering = -1
+  layers.forEach((layer, i) => {
+    if (covers(layer)) lastCovering = i
+  })
+  return layers.find((layer, i) => i > lastCovering && layer.type === 'symbol')?.id
+}
+
+// Each half of the search fades from grey (explored early) to white
+// (explored late), so the order of exploration shows even in a still
+// picture. The backward half of a bidirectional search is warmer.
 export function exploredColor(steps: number): ExpressionSpecification {
   const last = Math.max(steps, 1)
   return [
     'match',
     ['get', 'side'],
     'backward',
-    ['interpolate', ['linear'], ['get', 't'], 0, '#fdd663', last, '#c5221f'],
-    ['interpolate', ['linear'], ['get', 't'], 0, '#d7aefb', last, '#5b1f99'],
+    ['interpolate', ['linear'], ['get', 't'], 0, EXPLORED_BACKWARD[0], last, EXPLORED_BACKWARD[1]],
+    ['interpolate', ['linear'], ['get', 't'], 0, EXPLORED_FORWARD[0], last, EXPLORED_FORWARD[1]],
   ]
 }
 

@@ -4,7 +4,15 @@ import * as maplibregl from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 import type { LngLat } from '../api'
 import { INITIAL_CENTER, INITIAL_ZOOM, MAP_STYLE_URL } from '../config'
-import { exploredColor, routeLayerPosition } from '../mapLayers'
+import { exploredColor, routeLayerPosition, type StyleLayer } from '../mapLayers'
+import {
+  ALTERNATIVE,
+  ALTERNATIVE_CASING,
+  EXPLORED_OPACITY,
+  ROUTE,
+  ROUTE_CASING,
+  SNAP_LINE,
+} from '../mapTheme'
 import { type DecodedTrace, EDGE_FEATURE, VISIT_FEATURE } from '../trace'
 
 interface Props {
@@ -29,6 +37,10 @@ interface Props {
 }
 
 const ROUTE_SOURCE = 'route'
+// Wait this long after the route appears (or hides) before dimming (or
+// restoring) the explored network.
+const DIM_DELAY_MS = 300
+
 // Feature-state updates per frame when catching up after a big jump.
 const MAX_STATE_CHANGES_PER_FRAME = 20_000
 
@@ -47,9 +59,9 @@ function whenShown(opacity: number): maplibregl.ExpressionSpecification {
 // Leave room for the directions panel on the left when zooming to a route.
 const FIT_PADDING = { top: 80, bottom: 80, left: 420, right: 80 }
 
-function originElement(): HTMLElement {
+function markerElement(className: string): HTMLElement {
   const el = document.createElement('div')
-  el.className = 'origin-marker'
+  el.className = className
   return el
 }
 
@@ -90,11 +102,16 @@ export function MapView({
       attributionControl: { customAttribution: 'Search by <a href="https://photon.komoot.io">Photon</a>' },
     })
     map.addControl(new maplibregl.NavigationControl(), 'bottom-right')
+    // The dark style refers to a pattern image it doesn't ship; give MapLibre
+    // a transparent stand-in instead of a console warning.
+    map.setMissingStyleImageResolver((id) => {
+      if (!map.hasImage(id)) map.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) })
+    })
     map.on('click', (event) => onClickRef.current([event.lngLat.lng, event.lngLat.lat]))
     // 'style.load' fires once the style is parsed, without waiting for every
     // tile like 'load' does, so a route can be drawn while tiles still stream in.
     map.once('style.load', () => {
-      const firstSymbol = routeLayerPosition(map.getStyle().layers)
+      const firstSymbol = routeLayerPosition(map.getStyle().layers as StyleLayer[])
       map.addSource(EDGES_SOURCE, { type: 'geojson', data: emptyLine() })
       map.addSource(VISITS_SOURCE, { type: 'geojson', data: emptyLine() })
       map.addLayer(
@@ -103,7 +120,7 @@ export function MapView({
           type: 'line',
           source: EDGES_SOURCE,
           layout: { 'line-cap': 'round' },
-          paint: { 'line-color': exploredColor(1), 'line-width': 1.5, 'line-opacity': whenShown(0.55) },
+          paint: { 'line-color': exploredColor(1), 'line-width': 1.5, 'line-opacity': whenShown(EXPLORED_OPACITY.playing.edges) },
         },
         firstSymbol,
       )
@@ -115,7 +132,7 @@ export function MapView({
           paint: {
             'circle-color': exploredColor(1),
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 1, 16, 3],
-            'circle-opacity': whenShown(0.8),
+            'circle-opacity': whenShown(EXPLORED_OPACITY.playing.visits),
           },
         },
         firstSymbol,
@@ -127,7 +144,7 @@ export function MapView({
           type: 'line',
           source: ALTERNATIVES_SOURCE,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#80868b', 'line-width': 8 },
+          paint: { 'line-color': ALTERNATIVE_CASING, 'line-width': 8 },
         },
         firstSymbol,
       )
@@ -137,7 +154,7 @@ export function MapView({
           type: 'line',
           source: ALTERNATIVES_SOURCE,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#bbbdbf', 'line-width': 5 },
+          paint: { 'line-color': ALTERNATIVE, 'line-width': 5 },
         },
         firstSymbol,
       )
@@ -148,7 +165,7 @@ export function MapView({
           type: 'line',
           source: SNAP_SOURCE,
           layout: { 'line-cap': 'round' },
-          paint: { 'line-color': '#5f6368', 'line-width': 2, 'line-dasharray': [0.5, 2] },
+          paint: { 'line-color': SNAP_LINE, 'line-width': 2, 'line-dasharray': [0.5, 2] },
         },
         firstSymbol,
       )
@@ -159,7 +176,7 @@ export function MapView({
           type: 'line',
           source: ROUTE_SOURCE,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#1967d2', 'line-width': 9 },
+          paint: { 'line-color': ROUTE_CASING, 'line-width': 10 },
         },
         firstSymbol,
       )
@@ -169,7 +186,7 @@ export function MapView({
           type: 'line',
           source: ROUTE_SOURCE,
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#4285f4', 'line-width': 6 },
+          paint: { 'line-color': ROUTE, 'line-width': 6 },
         },
         firstSymbol,
       )
@@ -187,11 +204,11 @@ export function MapView({
   }, [])
 
   useEffect(() => {
-    syncMarker(mapRef.current, originMarker, origin, () => new maplibregl.Marker({ element: originElement() }))
+    syncMarker(mapRef.current, originMarker, origin, () => new maplibregl.Marker({ element: markerElement('origin-marker') }))
   }, [origin])
 
   useEffect(() => {
-    syncMarker(mapRef.current, destinationMarker, destination, () => new maplibregl.Marker({ color: '#ea4335' }))
+    syncMarker(mapRef.current, destinationMarker, destination, () => new maplibregl.Marker({ element: markerElement('destination-marker') }))
   }, [destination])
 
   // Read inside the focus effect without re-running it when the points change.
@@ -281,6 +298,22 @@ export function MapView({
     if (!map || !styleLoaded) return
     map.getSource<maplibregl.GeoJSONSource>(SNAP_SOURCE)?.setData(lines(snapLines))
   }, [snapLines, styleLoaded])
+
+  // Once the route is on screen, dim the explored network behind it. (This
+  // re-evaluates the layers once, which is fine for an occasional switch,
+  // unlike the per-frame updates above.)
+  // Applied after a short pause, so dragging the scrubber back and forth
+  // across the end doesn't re-evaluate the layers on every crossing.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !styleLoaded) return
+    const opacity = routeVisible && route ? EXPLORED_OPACITY.done : EXPLORED_OPACITY.playing
+    const timer = setTimeout(() => {
+      map.setPaintProperty(EDGES_LAYER, 'line-opacity', whenShown(opacity.edges))
+      map.setPaintProperty(VISITS_LAYER, 'circle-opacity', whenShown(opacity.visits))
+    }, DIM_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [routeVisible, route, styleLoaded])
 
   // The route line appears once the exploration has played out.
   useEffect(() => {

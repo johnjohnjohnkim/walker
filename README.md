@@ -12,7 +12,8 @@ watch how each one explores the street network.
 
 - **Backend:** Python 3.12, Django, managed with [uv](https://docs.astral.sh/uv/).
 - **Frontend:** React + TypeScript (Vite) with [MapLibre GL JS](https://maplibre.org/).
-- **Map data:** © OpenStreetMap contributors. Tiles from [OpenFreeMap](https://openfreemap.org/), place search from [Photon](https://photon.komoot.io/).
+- **Map data:** © OpenStreetMap contributors. Tiles from [OpenFreeMap](https://openfreemap.org/) (dark style), place search from [Photon](https://photon.komoot.io/).
+- **Type:** [IBM Plex Sans and IBM Plex Mono](https://www.ibm.com/plex/), the mono only for measured numbers.
 
 ## Running locally
 
@@ -92,13 +93,14 @@ Settings come from environment variables. See `backend/.env.example` and
    If a point isn't on a street, a dotted line joins it to where the route
    really starts.
 2. **Watch the search.** Every street segment the algorithm reaches is drawn
-   as it happens, light at first and darker later (the two halves of a
-   bidirectional search in purple and orange). Pause, scrub, change speed or
+   as it happens, grey at first and brightening to white as the search goes
+   on (the backward half of a bidirectional search in a warmer white). Pause, scrub, change speed or
    skip with the bar at the bottom. Explored streets are drawn as straight
    lines between intersections to keep the animation light. If your system
    is set to reduce motion, searches open already finished.
 3. **Read the result.** When the search reaches the end, the walking route
-   appears in blue with its time and distance, and the card under the
+   appears in purple with its time and distance, the explored streets dim
+   behind it, and the card under the
    directions shows what the search cost: time, memory, intersections
    explored, peak frontier size and how the route compares with the shortest.
 4. **Compare.** Pick another algorithm from the chips to re-run the route
