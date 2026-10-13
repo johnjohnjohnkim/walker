@@ -24,6 +24,10 @@ type Suggestions =
 export function SearchBox({ label, placeholder, value, marker, onSelect }: Props) {
   const [text, setText] = useState(value)
   const [editing, setEditing] = useState(false)
+  // True once the user has changed the text since focusing. Focusing fills the
+  // box with the chosen place's label ("Dropped pin", "CN Tower"), which is
+  // not something to search for.
+  const [typed, setTyped] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestions>({ kind: 'none' })
   const [active, setActive] = useState(-1)
   const listId = useId()
@@ -32,7 +36,7 @@ export function SearchBox({ label, placeholder, value, marker, onSelect }: Props
   // Show the chosen place when the user isn't typing.
   const shown = editing ? text : value
   const query = text.trim()
-  const shouldSearch = editing && query.length >= MIN_QUERY
+  const shouldSearch = editing && typed && query.length >= MIN_QUERY
 
   useEffect(() => {
     if (!shouldSearch) return
@@ -106,11 +110,13 @@ export function SearchBox({ label, placeholder, value, marker, onSelect }: Props
         onFocus={(event) => {
           setText(value)
           setEditing(true)
+          setTyped(false)
           event.currentTarget.select()
         }}
         onChange={(event) => {
           setText(event.target.value)
           setEditing(true)
+          setTyped(true)
         }}
         // Suggestions are picked on mousedown with preventDefault, so the
         // input keeps focus while one is clicked and blur can act at once.

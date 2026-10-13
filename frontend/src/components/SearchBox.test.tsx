@@ -56,6 +56,19 @@ describe('SearchBox', () => {
     ])
   })
 
+  it('does not search for the label already in the box when focused', async () => {
+    const fetchMock = respond({ results: [] })
+    const { input } = setup(vi.fn(), 'Dropped pin')
+
+    fireEvent.focus(input)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300)
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(input).toHaveValue('Dropped pin')
+  })
+
   it('does not search for a single character', async () => {
     const fetchMock = respond({ results: [] })
     const { input } = setup()
